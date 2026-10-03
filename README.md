@@ -1,4 +1,4 @@
-# Still Online Piano · MyOnlinePiano
+# Still Online Piano
 
 마우스, 키보드, MIDI 기기로 연주하는 온라인 피아노입니다. React, TypeScript, Vite, Web Audio API로 만들었으며 현재 버전은 별도의 백엔드·데이터베이스·API 키가 필요하지 않습니다.
 
@@ -50,7 +50,7 @@ GitHub Pages용 자동 테스트·배포 워크플로를 포함했습니다. 처
 | Node.js                     | 24 LTS          |
 | 환경 변수·서버·데이터베이스 | 필요 없음       |
 
-하위 경로로 배포한다면 `npm run build -- --base=/MyOnlinePiano/`처럼 base를 지정합니다. GitHub Pages 워크플로는 저장소 이름을 기준으로 이 경로를 지정합니다. 오디오와 글꼴은 빌드에 포함되어 같은 호스트에서 제공됩니다. 사이트는 분석 도구나 외부 음원·글꼴 요청 없이 실행되며, 연주 정보를 서버로 전송하지 않습니다. 볼륨 값만 사용자의 브라우저 localStorage에 저장합니다. 실제 공개 상태와 주소는 GitHub Actions의 배포 결과에서 확인합니다.
+하위 경로로 배포한다면 `npm run build -- --base=/StillOnlinePiano/`처럼 base를 지정합니다. GitHub Pages 워크플로는 저장소 이름을 기준으로 이 경로를 지정합니다. 오디오와 글꼴은 빌드에 포함되어 같은 호스트에서 제공됩니다. 사이트는 분석 도구나 외부 음원·글꼴 요청 없이 실행되며, 연주 정보를 서버로 전송하지 않습니다. 볼륨 값만 사용자의 브라우저 localStorage에 저장합니다. 실제 공개 상태와 주소는 GitHub Actions의 배포 결과에서 확인합니다.
 
 ## 주요 파일
 
