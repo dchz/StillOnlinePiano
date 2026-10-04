@@ -247,8 +247,7 @@
   border-color: #547a62;
 }
 .song-source {
-  flex-basis: 100%;
-  margin: 0;
+  margin: 32px 0 36px;
   font-size: 11px;
   color: #596454;
   line-height: 1.9;
@@ -303,6 +302,9 @@
   }
 }
 @media (max-width: 600px) {
+  .song-source {
+    margin: 24px 0 28px;
+  }
   .keyboard-lesson-hint {
     padding: 12px 14px;
   }
@@ -1178,10 +1180,6 @@ kbd {
   gap: 22px;
   flex-wrap: wrap;
   color: #65705c;
-}
-.site-footer:has(.song-source) {
-  padding-block: 24px;
-  row-gap: 18px;
 }
 .brand-small {
   font-size: 13px;

@@ -898,6 +898,7 @@ export default function App() {
           </div>
         </section>
 
+        {mode === "practice" && <SongSource songId={practice.songId} />}
         {mode === "free" && (
           <div className="closing-note">
             <Sparkles size={15} strokeWidth={1.3} />
@@ -906,7 +907,6 @@ export default function App() {
         )}
       </main>
       <footer className="site-footer">
-        {mode === "practice" && <SongSource songId={practice.songId} />}
         <Brand small />
       </footer>
 

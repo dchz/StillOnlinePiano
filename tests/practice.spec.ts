@@ -235,7 +235,7 @@ test("practice controls meet WCAG AA and expose the exact score sources", async 
   const keyboard = (await page.locator(".piano-keyboard").boundingBox())!;
   const speed = (await page.getByLabel("진행 속도").boundingBox())!;
   expect(speed.y).toBeGreaterThanOrEqual(keyboard.y + keyboard.height);
-  await expect(page.locator(".site-footer .song-source")).toBeAttached();
+  await expect(page.locator("main > .song-source")).toBeAttached();
   await page.getByText("발췌 범위와 악보 출처", { exact: true }).click();
   await expect(page.getByText(/Stelios Samelis/)).toBeVisible();
   const response = await request.get(
