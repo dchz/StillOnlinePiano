@@ -22,8 +22,20 @@ async function aligned(page: Page, index: number, note: number) {
 }
 async function pressExpected(page: Page) {
   const key = page.locator('.piano-key[data-expected="true"] .key-label');
+  const progress = page.getByRole("progressbar", { name: "연습 진행" });
+  const before = await progress.getAttribute("value");
   await expect(key).not.toHaveText("");
   await page.keyboard.press((await key.innerText()).toLowerCase());
+  await expect(progress).not.toHaveAttribute("value", before!);
+}
+async function startPractice(page: Page) {
+  await page.getByRole("button", { name: "연습 시작", exact: true }).click();
+  // AudioContext.resume() uses the browser's real clock, independent of the
+  // paused animation clock. Wait for the async start before advancing frames.
+  await expect(
+    page.getByRole("button", { name: "일시정지", exact: true }),
+  ).toBeVisible();
+  await expect(roll(page)).toHaveAttribute("data-motion", "practicing");
 }
 
 test("notes descend into their keys, wait for a correct note, and freeze on pause", async ({
@@ -36,7 +48,7 @@ test("notes descend into their keys, wait for a correct note, and freeze on paus
   const relativeY = async () =>
     (await bar.boundingBox())!.y - (await roll(page).boundingBox())!.y;
   const initialY = await relativeY();
-  await page.getByRole("button", { name: "연습 시작", exact: true }).click();
+  await startPractice(page);
   await page.clock.runFor(400);
   expect(await relativeY()).toBeGreaterThan(initialY);
   await page.clock.runFor(1600);
@@ -70,7 +82,7 @@ test("preview audio starts as its bar hits the line and stopping restores practi
 }) => {
   await ready(page);
   await page.getByLabel("연습 구간").selectOption("0");
-  await page.getByRole("button", { name: "연습 시작", exact: true }).click();
+  await startPractice(page);
   await page.clock.runFor(2000);
   await pressExpected(page);
   await page.clock.runFor(100);
@@ -106,7 +118,7 @@ test("long notes keep proportional lengths and octave changes do not move the la
   expect((await height(8)) / (await height(0))).toBeCloseTo(3);
   expect((await height(9)) / (await height(0))).toBeCloseTo(12);
   const keyboardX = (await page.locator('[data-note="60"]').boundingBox())!.x;
-  await page.getByRole("button", { name: "연습 시작", exact: true }).click();
+  await startPractice(page);
   for (let i = 0; i < 6; i++) {
     await aligned(page, i, lessonNotes(SONGS[1], null)[i].midi);
     await pressExpected(page);
@@ -125,7 +137,7 @@ test("half speed slows the visual clock and replay resets the runway", async ({
   await page.getByLabel("진행 속도").selectOption("0.5");
   await page.getByLabel("연습 구간").selectOption("0");
   await page.getByRole("button", { name: "선택 구간 반복" }).click();
-  await page.getByRole("button", { name: "연습 시작", exact: true }).click();
+  await startPractice(page);
   await page.clock.runFor(1000);
   expect(Number(await playhead(page))).toBeCloseTo(-1.4, 1);
   for (const _note of SONGS[0].sections[0].notes) await pressExpected(page);
@@ -141,7 +153,7 @@ test("reduced motion presents static upcoming notes and steps on correct input",
 }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await ready(page);
-  await page.getByRole("button", { name: "연습 시작", exact: true }).click();
+  await startPractice(page);
   await page.clock.runFor(50);
   expect(Number(await playhead(page))).toBe(0);
   await page.clock.runFor(4000);
@@ -154,7 +166,7 @@ test("reduced motion presents static upcoming notes and steps on correct input",
 test("desktop waterfall visual reference", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1100 });
   await ready(page);
-  await page.getByRole("button", { name: "연습 시작", exact: true }).click();
+  await startPractice(page);
   await page.clock.runFor(2000);
   await page
     .locator(".piano-studio")
@@ -171,7 +183,7 @@ test.describe("mobile waterfall", () => {
     page,
   }) => {
     await ready(page);
-    await page.getByRole("button", { name: "연습 시작", exact: true }).click();
+    await startPractice(page);
     await page.clock.runFor(2000);
     await aligned(page, 0, 76);
     await aligned(page, 1, 75);
