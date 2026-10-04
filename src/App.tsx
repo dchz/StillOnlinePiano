@@ -898,10 +898,12 @@ export default function App() {
           </div>
         </section>
 
-        <div className="closing-note">
-          <Sparkles size={15} strokeWidth={1.3} />
-          <span>틀린 음은 없어요. 당신의 음악이 있을 뿐.</span>
-        </div>
+        {mode === "free" && (
+          <div className="closing-note">
+            <Sparkles size={15} strokeWidth={1.3} />
+            <span>틀린 음은 없어요. 당신의 음악이 있을 뿐.</span>
+          </div>
+        )}
       </main>
       <footer className="site-footer">
         <Brand small />
