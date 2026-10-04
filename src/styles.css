@@ -4,10 +4,7 @@
 @import "@fontsource/noto-serif-kr/400.css";
 
 .mode-heading {
-  padding: 51px 0 26px;
-}
-.mode-heading .eyebrow {
-  margin-bottom: 18px;
+  padding: 28px 0 26px;
 }
 .mode-switch {
   display: flex;
@@ -1367,9 +1364,6 @@ kbd {
   .site-shell {
     padding: 0 74px;
   }
-  .mode-heading {
-    padding-top: 64px;
-  }
   .intro {
     padding-bottom: 56px;
   }
@@ -1412,9 +1406,6 @@ kbd {
   }
   .header-tagline {
     display: none;
-  }
-  .mode-heading {
-    padding-top: 38px;
   }
   .intro {
     padding: 0 0 38px;
@@ -1529,10 +1520,7 @@ kbd {
     display: none;
   }
   .mode-heading {
-    padding-top: 32px;
-  }
-  .mode-heading .eyebrow {
-    margin-bottom: 16px;
+    padding-top: 24px;
   }
   .intro {
     padding: 0 0 31px;

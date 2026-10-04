@@ -578,9 +578,6 @@ export default function App() {
       </header>
       <main>
         <div className="mode-heading">
-          <p className="eyebrow">
-            <span /> A LITTLE ROOM FOR YOUR MUSIC
-          </p>
           <div className="mode-switch" role="group" aria-label="연주 모드">
             <button
               aria-pressed={mode === "free"}
