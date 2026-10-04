@@ -53,28 +53,51 @@ test("long notes retain their lengths and automatic octave changes keep physical
   await aligned(page, 5, 71);
 });
 
-test("reduced motion uses static steps while the music and progress continue automatically", async ({
-  page,
-}) => {
-  await page.emulateMedia({ reducedMotion: "reduce" });
-  await ready(page);
-  await start(page);
-  const transform = () =>
-    page
-      .locator(".roll-note-layer")
-      .evaluate((el) => getComputedStyle(el).transform);
-  const initial = await transform();
-  await page.clock.runFor(1000);
-  expect(await transform()).toBe(initial);
-  await page.clock.runFor(700);
-  expect(await transform()).not.toBe(initial);
-  await expect(page.locator('[data-note="76"]')).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
-  await page.clock.runFor(250);
-  await expect(progress(page)).toHaveAttribute("value", "1");
-});
+for (const reducedMotion of ["no-preference", "reduce"] as const) {
+  test(`notes move continuously between onsets with ${reducedMotion} motion preference`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ reducedMotion });
+    await ready(page);
+    await start(page);
+    const measureSteps = async () => {
+      await page.evaluate(() => {
+        const samples: number[] = [];
+        (window as any).__motionSamples = samples;
+        const layer = document.querySelector(".roll-note-layer")!;
+        const sample = () => {
+          samples.push(
+            new DOMMatrixReadOnly(getComputedStyle(layer).transform).m42,
+          );
+          if (samples.length < 20) requestAnimationFrame(sample);
+        };
+        requestAnimationFrame(sample);
+      });
+      await page.clock.runFor(352);
+      const samples: number[] = await page.evaluate(
+        () => (window as any).__motionSamples,
+      );
+      expect(samples).toHaveLength(20);
+      return samples.slice(1).map((value, index) => value - samples[index]);
+    };
+    const normal = await measureSteps();
+    // At 72 BPM and 80 px/beat each 16 ms frame moves about 1.54 px.
+    // An onset-only implementation remains stationary for most frames.
+    for (const step of normal) expect(step).toBeGreaterThan(1);
+    expect(Math.max(...normal)).toBeLessThan(2);
+    await page.getByLabel("진행 속도").selectOption("0.5");
+    const slow = await measureSteps();
+    for (const step of slow) expect(step).toBeGreaterThan(0.5);
+    expect(Math.max(...slow)).toBeLessThan(1);
+    await expect(progress(page)).toHaveAttribute("value", "0");
+    await page.getByRole("button", { name: "일시정지", exact: true }).click();
+    const position = await beat(page);
+    await page.clock.runFor(2000);
+    expect(await beat(page)).toBe(position);
+    await start(page, "이어서 연습");
+    for (const step of await measureSteps()) expect(step).toBeGreaterThan(0.5);
+  });
+}
 
 test("desktop automatic-playback visual reference", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1100 });

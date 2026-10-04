@@ -26,6 +26,7 @@ export class LessonPlayer {
   private speed = 1;
   private lastTime = 0;
   private voice: string | null = null;
+  private listeners = new Set<(position: PlaybackPosition) => void>();
 
   constructor(
     notes: LessonNote[],
@@ -33,6 +34,17 @@ export class LessonPlayer {
     private output: Output,
   ) {
     this.timeline = buildTimeline(notes);
+  }
+  subscribe(listener: (position: PlaybackPosition) => void) {
+    this.listeners.add(listener);
+    listener(this.position);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+  private notify() {
+    for (const listener of this.listeners) listener(this.position);
+    return this.position;
   }
   reset() {
     this.silence();
@@ -42,6 +54,7 @@ export class LessonPlayer {
       laps: 0,
       status: "ready",
     };
+    this.notify();
   }
   start(now: number) {
     if (this.position.status === "complete") this.reset();
@@ -56,7 +69,7 @@ export class LessonPlayer {
         this.position = { ...this.position, status: "paused" };
     }
     this.silence();
-    return this.position;
+    return this.notify();
   }
   setSpeed(speed: number, now: number) {
     this.tick(now);
@@ -79,7 +92,7 @@ export class LessonPlayer {
           laps: laps + 1,
           status: "complete",
         };
-        return this.position;
+        return this.notify();
       }
       const span = duration + ROLL_LEAD_BEATS;
       const passes = Math.floor((beat + ROLL_LEAD_BEATS) / span);
@@ -103,7 +116,7 @@ export class LessonPlayer {
       laps,
       status: "practicing",
     };
-    return this.position;
+    return this.notify();
   }
   private silence() {
     if (this.voice) this.output.stop(this.voice);

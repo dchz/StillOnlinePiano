@@ -46,7 +46,7 @@
   pointer-events: none;
 }
 .roll-note-layer {
-  transform: translateY(var(--roll-offset, -160px));
+  transform: translate3d(0, -160px, 0);
   will-change: transform;
 }
 .roll-lane {
@@ -195,9 +195,6 @@
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .roll-note-layer {
-    will-change: auto;
-  }
   .roll-impact {
     display: none;
   }

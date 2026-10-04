@@ -285,9 +285,19 @@ export default function App() {
     if (practice.status === "ready") lessonPlayer.reset();
     if (practice.status !== "practicing") return;
     let frame = 0;
+    let shown = lessonPlayer.position;
     const tick = (now: number) => {
       const position = lessonPlayer.tick(now);
-      dispatchPractice({ type: "playback", position });
+      // The note layer paints every frame directly from the player. React only
+      // needs to update the controls when the musical progress changes.
+      if (
+        position.cursor !== shown.cursor ||
+        position.laps !== shown.laps ||
+        position.status !== shown.status
+      ) {
+        shown = position;
+        dispatchPractice({ type: "playback", position });
+      }
       if (position.status === "practicing") frame = requestAnimationFrame(tick);
     };
     frame = requestAnimationFrame(tick);

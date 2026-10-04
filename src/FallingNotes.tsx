@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { isBlack, noteName } from "./music";
 import type { PracticeState } from "./practice";
 import type { LessonNote } from "./songs";
@@ -6,7 +6,6 @@ import type { LessonPlayer } from "./lessonPlayer";
 import {
   buildTimeline,
   pianoKeyGeometry,
-  ROLL_LEAD_BEATS,
   ROLL_PIXELS_PER_BEAT,
 } from "./pianoRoll";
 
@@ -28,44 +27,22 @@ export function FallingNotes({
   const timeline = useMemo(() => buildTimeline(notes), [notes]);
   const root = useRef<HTMLDivElement>(null);
   const layer = useRef<HTMLDivElement>(null);
-  const [reducedMotion, setReducedMotion] = useState(
-    () => window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+  useEffect(
+    () =>
+      player.subscribe((position) => {
+        // Essential timing guidance stays continuous even when decorative motion is
+        // reduced. Paint from the same tick that plays audio, without a second RAF.
+        if (layer.current) {
+          layer.current.style.transform = `translate3d(0, ${position.beat * ROLL_PIXELS_PER_BEAT}px, 0)`;
+        }
+        if (root.current) {
+          root.current.dataset.playhead = position.beat.toFixed(3);
+          root.current.dataset.motion =
+            position.status === "practicing" ? "moving" : position.status;
+        }
+      }),
+    [player],
   );
-
-  useEffect(() => {
-    const query = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const update = () => setReducedMotion(query.matches);
-    query.addEventListener("change", update);
-    return () => query.removeEventListener("change", update);
-  }, []);
-
-  useEffect(() => {
-    let frame = 0;
-    const paint = () => {
-      const position =
-        state.status === "ready"
-          ? { ...player.position, beat: -ROLL_LEAD_BEATS, status: "ready" }
-          : player.position;
-      const beat =
-        reducedMotion && position.status !== "complete"
-          ? (timeline.entries
-              .filter((entry) => entry.start <= position.beat)
-              .at(-1)?.start ?? -ROLL_LEAD_BEATS)
-          : position.beat;
-      layer.current?.style.setProperty(
-        "--roll-offset",
-        `${beat * ROLL_PIXELS_PER_BEAT}px`,
-      );
-      if (root.current) {
-        root.current.dataset.playhead = position.beat.toFixed(3);
-        root.current.dataset.motion =
-          position.status === "practicing" ? "moving" : position.status;
-      }
-      if (state.status === "practicing") frame = requestAnimationFrame(paint);
-    };
-    paint();
-    return () => cancelAnimationFrame(frame);
-  }, [player, timeline, reducedMotion, state.status]);
 
   const current = state.cursor;
   const upcoming = timeline.entries
