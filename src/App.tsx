@@ -14,7 +14,6 @@ import {
   Check,
   ChevronRight,
   CircleHelp,
-  Headphones,
   Keyboard,
   LoaderCircle,
   MousePointer2,
@@ -30,7 +29,7 @@ import {
 } from "lucide-react";
 import { PianoAudio } from "./audio";
 import type { SampleState } from "./audio";
-import { PracticePanel } from "./PracticePanel";
+import { PracticeControls, SongLibrary, SongSource } from "./PracticePanel";
 import { FallingNotes } from "./FallingNotes";
 import "./pianoRoll.css";
 import { LessonPlayer } from "./lessonPlayer";
@@ -511,13 +510,11 @@ export default function App() {
   const base = (octave + 1) * 12;
   const VolumeIcon = volume === 0 ? VolumeX : volume < 45 ? Volume1 : Volume2;
   const soundStatus =
-    sampleState === "ready"
-      ? "연주할 준비가 되었어요"
-      : sampleState === "loading"
-        ? "피아노 음원을 준비하고 있어요"
-        : sampleState === "fallback"
-          ? "기본 음색 사용 중 · 음원을 불러오지 못했어요"
-          : "이 브라우저는 오디오를 지원하지 않아요";
+    sampleState === "loading"
+      ? "피아노 음원을 준비하고 있어요"
+      : sampleState === "fallback"
+        ? "기본 음색 사용 중 · 음원을 불러오지 못했어요"
+        : "이 브라우저는 오디오를 지원하지 않아요";
 
   const renderKey = (note: number) => {
     const black = isBlack(note);
@@ -642,32 +639,26 @@ export default function App() {
           </button>
         </div>
         {mode === "practice" && (
-          <PracticePanel
+          <SongLibrary
             state={practice}
             dispatch={dispatchPractice}
-            octave={octave}
-            speed={practiceSpeed}
-            disabled={sampleState === "unsupported"}
-            onSpeed={setPracticeSpeed}
-            onStart={() => void startLesson()}
             onStop={panic}
           />
         )}
 
         <section className="studio-section" aria-label="온라인 피아노">
-          <div className="studio-caption">
-            <div
-              className={`ready-status ${sampleState === "loading" ? "loading" : ""} ${sampleState === "fallback" || sampleState === "unsupported" ? "warning" : ""}`}
-              role="status"
-            >
-              <span className="status-dot" />
-              {soundStatus}
+          {sampleState !== "ready" && (
+            <div className="studio-caption">
+              <div
+                className={`ready-status ${sampleState === "loading" ? "loading" : ""} ${sampleState === "fallback" || sampleState === "unsupported" ? "warning" : ""}`}
+                role="status"
+              >
+                <span className="status-dot" />
+                {soundStatus}
+              </div>
             </div>
-            <span className="headphone-tip">
-              <Headphones size={14} /> 헤드폰과 함께라면 더 좋아요
-            </span>
-          </div>
-          <div className="piano-studio">
+          )}
+          <div className="piano-studio" data-sample-state={sampleState}>
             <div className="instrument-toolbar">
               <div className="instrument-name">
                 <span className="instrument-icon">
@@ -723,45 +714,30 @@ export default function App() {
             </div>
             {mode === "practice" && (
               <div className="keyboard-lesson-hint">
-                <div>
-                  <span className="keyboard-lesson-title">
-                    {song.title} · {practice.cursor}/{notes.length}음
-                  </span>
-                  <span className="keyboard-lesson-target">
-                    {practice.status === "complete" ? (
-                      "선율 재생이 끝났어요."
-                    ) : (
-                      <>
-                        {practice.status === "paused"
-                          ? "일시정지 · 이어 칠 음"
-                          : "따라 칠 음"}
-                        <strong>
-                          {expectedNote === undefined
-                            ? "쉼"
-                            : noteName(expectedNote)}
-                        </strong>
-                        <kbd>{KEY_LABELS[expectedNote! - base]}</kbd>
-                      </>
-                    )}
-                  </span>
-                </div>
-                <button
-                  className="lesson-secondary"
-                  disabled={sampleState === "unsupported"}
-                  onClick={() =>
-                    practice.status === "practicing"
-                      ? panic()
-                      : void startLesson()
+                <span className="keyboard-lesson-title">{song.title}</span>
+                <span
+                  className="keyboard-lesson-target"
+                  role="status"
+                  aria-live={
+                    practice.status === "practicing" ? "off" : "polite"
                   }
                 >
-                  {practice.status === "practicing"
-                    ? "연습 일시정지"
-                    : practice.status === "paused"
-                      ? "연습 이어하기"
-                      : practice.status === "complete"
-                        ? "한 번 더 연주"
-                        : "여기서 연습 시작"}
-                </button>
+                  {practice.status === "complete" ? (
+                    "선율 재생이 끝났어요!"
+                  ) : (
+                    <>
+                      {practice.status === "paused"
+                        ? "일시정지 · 이어 칠 음"
+                        : "따라 칠 음"}
+                      <strong>
+                        {expectedNote === undefined
+                          ? "쉼"
+                          : noteName(expectedNote)}
+                      </strong>
+                      <kbd>{KEY_LABELS[expectedNote! - base]}</kbd>
+                    </>
+                  )}
+                </span>
               </div>
             )}
             <div className="piano-body">
@@ -831,6 +807,17 @@ export default function App() {
               </div>
               <div className="piano-front" />
             </div>
+            {mode === "practice" && (
+              <PracticeControls
+                state={practice}
+                dispatch={dispatchPractice}
+                speed={practiceSpeed}
+                disabled={sampleState === "unsupported"}
+                onSpeed={setPracticeSpeed}
+                onStart={() => void startLesson()}
+                onStop={panic}
+              />
+            )}
             <div className="performance-toolbar">
               <div className="octave-control">
                 <span>옥타브</span>
@@ -918,6 +905,7 @@ export default function App() {
       </main>
       <footer className="site-footer">
         <Brand small />
+        {mode === "practice" && <SongSource songId={practice.songId} />}
       </footer>
 
       <dialog

@@ -7,39 +7,16 @@ import {
   RotateCcw,
 } from "lucide-react";
 import type { Dispatch } from "react";
-import { KEY_LABELS, noteName } from "./music";
 import type { PracticeAction, PracticeState } from "./practice";
 import { lessonNotes, SONGS } from "./songs";
 
-type Props = {
+type PracticeProps = {
   state: PracticeState;
   dispatch: Dispatch<PracticeAction>;
-  octave: number;
-  speed: number;
-  disabled: boolean;
-  onSpeed: (speed: number) => void;
-  onStart: () => void;
   onStop: () => void;
 };
 
-export function PracticePanel({
-  state,
-  dispatch,
-  octave,
-  speed,
-  disabled,
-  onSpeed,
-  onStart,
-  onStop,
-}: Props) {
-  const song = SONGS.find((item) => item.id === state.songId)!;
-  const notes = lessonNotes(song, state.section);
-  const next = notes[state.cursor];
-  const keyLabel = next ? KEY_LABELS[next.midi - (octave + 1) * 12] : undefined;
-  const choose = (action: PracticeAction) => {
-    onStop();
-    dispatch(action);
-  };
+export function SongLibrary({ state, dispatch, onStop }: PracticeProps) {
   return (
     <section className="practice-section" aria-labelledby="practice-title">
       <div className="practice-heading">
@@ -50,23 +27,26 @@ export function PracticePanel({
         <span className="pd-label">퍼블릭 도메인 원곡 · 2곡</span>
       </div>
       <div className="song-library" aria-label="연습곡 선택">
-        {SONGS.map((item, index) => (
+        {SONGS.map((song, index) => (
           <button
-            key={item.id}
-            className={`song-card ${song.id === item.id ? "selected" : ""}`}
-            aria-pressed={song.id === item.id}
-            onClick={() => choose({ type: "select", songId: item.id })}
+            key={song.id}
+            className={`song-card ${state.songId === song.id ? "selected" : ""}`}
+            aria-pressed={state.songId === song.id}
+            onClick={() => {
+              onStop();
+              dispatch({ type: "select", songId: song.id });
+            }}
           >
             <span className="song-number">0{index + 1}</span>
             <span className="song-copy">
-              <span className="song-composer">{item.composer}</span>
-              <strong>{item.title}</strong>
-              <span className="song-description">{item.description}</span>
+              <span className="song-composer">{song.composer}</span>
+              <strong>{song.title}</strong>
+              <span className="song-description">{song.description}</span>
               <span className="song-meta">
-                단선율 발췌 · {lessonNotes(item, null).length}음
+                단선율 발췌 · {lessonNotes(song, null).length}음
               </span>
             </span>
-            {song.id === item.id ? (
+            {state.songId === song.id ? (
               <Check size={18} aria-hidden="true" />
             ) : (
               <ChevronRight size={18} aria-hidden="true" />
@@ -74,174 +54,157 @@ export function PracticePanel({
           </button>
         ))}
       </div>
-
-      <div className="lesson-workspace">
-        <div className="lesson-toolbar">
-          <label>
-            연습 구간
-            <select
-              value={state.section ?? "all"}
-              onChange={(event) =>
-                choose({
-                  type: "section",
-                  section:
-                    event.target.value === "all"
-                      ? null
-                      : Number(event.target.value),
-                })
-              }
-            >
-              <option value="all">발췌 전체</option>
-              {song.sections.map((part, index) => (
-                <option key={index} value={index}>
-                  {part.title}
-                </option>
-              ))}
-            </select>
-          </label>
-          <div className="listen-controls">
-            <label>
-              진행 속도
-              <select
-                value={speed}
-                onChange={(event) => {
-                  onSpeed(Number(event.target.value));
-                }}
-              >
-                <option value={0.5}>0.5배</option>
-                <option value={0.75}>0.75배</option>
-                <option value={1}>1배</option>
-                <option value={1.25}>1.25배</option>
-              </select>
-            </label>
-          </div>
-        </div>
-
-        <div className="lesson-main">
-          <div
-            className="lesson-instruction"
-            role="status"
-            aria-live={state.status === "practicing" ? "off" : "polite"}
-            aria-atomic="true"
-          >
-            {state.status === "complete" ? (
-              <>
-                <span className="lesson-kicker">PLAYBACK COMPLETE</span>
-                <h3>선율 재생이 끝났어요!</h3>
-                <p>{notes.length}음 재생 완료 · 다시 따라 연주해 보세요.</p>
-              </>
-            ) : (
-              <>
-                <span className="lesson-kicker">
-                  {state.status === "paused"
-                    ? "잠시 쉬는 중"
-                    : state.status === "practicing"
-                      ? "음악에 맞춰 따라 연주하세요"
-                      : "준비되면 연습을 시작하세요"}
-                </span>
-                <h3>
-                  <span>{next ? noteName(next.midi) : "쉼"}</span>
-                  {keyLabel && (
-                    <>
-                      <span className="note-to-key">키보드</span>
-                      <kbd>{keyLabel}</kbd>
-                    </>
-                  )}
-                </h3>
-                <p>건반을 누르지 않아도 음악과 음표는 계속 진행돼요.</p>
-              </>
-            )}
-          </div>
-          <div className="lesson-sequence">
-            <div className="lesson-progress-label">
-              <span>
-                {state.cursor} / {notes.length}음
-              </span>
-              <span>
-                {state.laps > 0 ? `${state.laps}회 재생` : "자동 재생"}
-              </span>
-            </div>
-            <progress
-              aria-label="연습 진행"
-              value={state.cursor}
-              max={notes.length}
-            />
-          </div>
-        </div>
-
-        <div className="lesson-actions">
-          {state.status === "practicing" ? (
-            <button className="lesson-primary" onClick={onStop}>
-              <Pause size={15} />
-              일시정지
-            </button>
-          ) : (
-            <button
-              className="lesson-primary"
-              onClick={onStart}
-              disabled={disabled}
-            >
-              <Play size={15} />
-              {state.status === "paused"
-                ? "이어서 연습"
-                : state.status === "complete"
-                  ? "다시 연습"
-                  : "연습 시작"}
-            </button>
-          )}
-          <button
-            className="lesson-secondary"
-            onClick={() => choose({ type: "reset" })}
-          >
-            <RotateCcw size={15} />
-            처음부터
-          </button>
-          <button
-            className={`lesson-secondary loop-button ${state.loop ? "active" : ""}`}
-            aria-pressed={state.loop}
-            onClick={() => dispatch({ type: "loop" })}
-          >
-            <Repeat2 size={15} />
-            선택 구간 반복
-          </button>
-        </div>
-        <p className="lesson-help">
-          막대가 건반 위 선에 닿으면 해당 건반을 눌러 주세요. 긴 막대는 길게
-          이어지는 음이에요. 음악은 입력과 관계없이 자동으로 재생돼요. 편하게
-          따라 연주해 보세요. 연주를 채점하지 않아요.
-        </p>
-      </div>
-
-      <details className="song-source">
-        <summary>발췌 범위와 악보 출처</summary>
-        <p>
-          <strong>{song.originalTitle}</strong> · {song.composer} ({song.years})
-        </p>
-        <p>
-          {song.excerpt}. {song.source.changes}
-        </p>
-        <p>
-          원곡: {song.source.publicationYear}년 출판, 작곡가{" "}
-          {song.source.composerDeathYear}년 사망. 대한민국·미국·EU의 일반
-          보호기간 기준으로 퍼블릭 도메인에 해당합니다.
-        </p>
-        <p>
-          악보: {song.source.edition}. {song.source.typesetter}가 사보한 원문의
-          이용 표시: <strong>{song.source.license}</strong>.
-        </p>
-        <p>
-          <a href={song.source.url} target="_blank" rel="noreferrer">
-            Mutopia 출처 보기 ↗
-          </a>
-          <a
-            href={`${import.meta.env.BASE_URL}scores/${song.source.file}`}
-            target="_blank"
-            rel="noreferrer"
-          >
-            사용한 악보 원문 ↗
-          </a>
-        </p>
-      </details>
     </section>
+  );
+}
+
+type ControlsProps = PracticeProps & {
+  speed: number;
+  disabled: boolean;
+  onSpeed: (speed: number) => void;
+  onStart: () => void;
+};
+
+export function PracticeControls({
+  state,
+  dispatch,
+  speed,
+  disabled,
+  onSpeed,
+  onStart,
+  onStop,
+}: ControlsProps) {
+  const song = SONGS.find((item) => item.id === state.songId)!;
+  const notes = lessonNotes(song, state.section);
+  const choose = (action: PracticeAction) => {
+    onStop();
+    dispatch(action);
+  };
+
+  return (
+    <div className="practice-controls" role="group" aria-label="연습 재생 조절">
+      <div className="lesson-actions">
+        {state.status === "practicing" ? (
+          <button className="lesson-primary" onClick={onStop}>
+            <Pause size={15} aria-hidden="true" />
+            일시정지
+          </button>
+        ) : (
+          <button
+            className="lesson-primary"
+            onClick={onStart}
+            disabled={disabled}
+          >
+            <Play size={15} aria-hidden="true" />
+            {state.status === "paused"
+              ? "이어서 연습"
+              : state.status === "complete"
+                ? "다시 연습"
+                : "연습 시작"}
+          </button>
+        )}
+        <button
+          className="lesson-secondary"
+          onClick={() => choose({ type: "reset" })}
+        >
+          <RotateCcw size={15} aria-hidden="true" />
+          처음부터
+        </button>
+        <button
+          className={`lesson-secondary loop-button ${state.loop ? "active" : ""}`}
+          aria-label="선택 구간 반복"
+          aria-pressed={state.loop}
+          onClick={() => dispatch({ type: "loop" })}
+        >
+          <Repeat2 size={15} aria-hidden="true" />
+          구간 반복
+        </button>
+      </div>
+      <div className="lesson-settings">
+        <label>
+          연습 구간
+          <select
+            value={state.section ?? "all"}
+            onChange={(event) =>
+              choose({
+                type: "section",
+                section:
+                  event.target.value === "all"
+                    ? null
+                    : Number(event.target.value),
+              })
+            }
+          >
+            <option value="all">발췌 전체</option>
+            {song.sections.map((part, index) => (
+              <option key={index} value={index}>
+                {part.title}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          진행 속도
+          <select
+            value={speed}
+            onChange={(event) => onSpeed(Number(event.target.value))}
+          >
+            <option value={0.5}>0.5배</option>
+            <option value={0.75}>0.75배</option>
+            <option value={1}>1배</option>
+            <option value={1.25}>1.25배</option>
+          </select>
+        </label>
+      </div>
+      <div className="lesson-sequence">
+        <span className="lesson-progress-label">
+          {state.cursor} / {notes.length}음
+        </span>
+        <progress
+          aria-label="연습 진행"
+          value={state.cursor}
+          max={notes.length}
+        />
+        {state.laps > 0 && (
+          <span className="lesson-progress-label">{state.laps}회 재생</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export function SongSource({ songId }: { songId: string }) {
+  const song = SONGS.find((item) => item.id === songId)!;
+  return (
+    <details className="song-source">
+      <summary>발췌 범위와 악보 출처</summary>
+      <p>
+        <strong>{song.originalTitle}</strong> · {song.composer} ({song.years})
+      </p>
+      <p>
+        {song.excerpt}. {song.source.changes}
+      </p>
+      <p>
+        원곡: {song.source.publicationYear}년 출판, 작곡가{" "}
+        {song.source.composerDeathYear}년 사망. 대한민국·미국·EU의 일반 보호기간
+        기준으로 퍼블릭 도메인에 해당합니다.
+      </p>
+      <p>
+        악보: {song.source.edition}. {song.source.typesetter}가 사보한 원문의
+        이용 표시: <strong>{song.source.license}</strong>.
+      </p>
+      <p>
+        <a href={song.source.url} target="_blank" rel="noreferrer">
+          Mutopia 출처 보기 ↗
+        </a>
+        <a
+          href={`${import.meta.env.BASE_URL}scores/${song.source.file}`}
+          target="_blank"
+          rel="noreferrer"
+        >
+          사용한 악보 원문 ↗
+        </a>
+      </p>
+    </details>
   );
 }

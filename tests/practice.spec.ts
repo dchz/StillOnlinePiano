@@ -229,6 +229,13 @@ test("practice controls meet WCAG AA and expose the exact score sources", async 
   request,
 }) => {
   await ready(page, false);
+  await expect(page.getByText("연주할 준비가 되었어요")).toHaveCount(0);
+  await expect(page.getByText(/헤드폰과 함께/)).toHaveCount(0);
+  await expect(page.locator(".lesson-workspace")).toHaveCount(0);
+  const keyboard = (await page.locator(".piano-keyboard").boundingBox())!;
+  const speed = (await page.getByLabel("진행 속도").boundingBox())!;
+  expect(speed.y).toBeGreaterThanOrEqual(keyboard.y + keyboard.height);
+  await expect(page.locator(".site-footer .song-source")).toBeAttached();
   await page.getByText("발췌 범위와 악보 출처", { exact: true }).click();
   await expect(page.getByText(/Stelios Samelis/)).toBeVisible();
   const response = await request.get(

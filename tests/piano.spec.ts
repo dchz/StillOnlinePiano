@@ -16,7 +16,10 @@ test("page and guide meet automated WCAG AA checks", async ({ page }) => {
 });
 async function ready(page: Page) {
   await page.goto("/");
-  await expect(page.getByText("연주할 준비가 되었어요")).toBeVisible();
+  await expect(page.locator(".piano-studio")).toHaveAttribute(
+    "data-sample-state",
+    "ready",
+  );
 }
 
 test("loads a complete local instrument and plays a chord with real audio output", async ({

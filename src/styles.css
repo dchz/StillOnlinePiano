@@ -46,11 +46,6 @@
   background: #edf2e9;
   border-top: 1px solid #d9e1d3;
 }
-.keyboard-lesson-hint > div {
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-}
 .keyboard-lesson-title {
   font-size: 10px;
   color: #566350;
@@ -147,29 +142,28 @@
   color: #355e51;
   flex-shrink: 0;
 }
-.lesson-workspace {
-  border: 1px solid #dedfd5;
-  border-radius: 12px;
-  background: #fffefb;
-  overflow: hidden;
-}
-.lesson-toolbar {
-  display: flex;
-  justify-content: space-between;
+.practice-controls {
+  display: grid;
+  grid-template-columns: 1fr auto;
   align-items: center;
-  gap: 16px;
-  padding: 15px 24px;
+  gap: 16px 24px;
+  padding: 18px 24px;
+  background: #fffefa;
   border-bottom: 1px solid #e5e5dc;
-  background: #f2f3ec;
 }
-.lesson-toolbar label {
+.lesson-settings {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+.lesson-settings label {
   display: flex;
   align-items: center;
   gap: 9px;
   font-size: 11px;
   color: #566350;
 }
-.lesson-toolbar select {
+.lesson-settings select {
   max-width: 100%;
   padding: 8px 25px 8px 10px;
   border-radius: 5px;
@@ -178,75 +172,32 @@
   color: #354b3b;
   font: inherit;
 }
-.lesson-toolbar select:focus-visible,
+.lesson-settings select:focus-visible,
 .song-source summary:focus-visible {
   outline: 2px solid #355e51;
   outline-offset: 3px;
 }
-.listen-controls {
-  display: flex;
-  gap: 16px;
-  align-items: center;
-}
-.lesson-main {
-  display: grid;
-  grid-template-columns: 1fr 1.25fr;
-  align-items: center;
-  gap: 32px;
-  padding: 25px 26px;
-}
-.lesson-kicker {
-  color: #566350;
-  font-size: 11px;
-}
-.lesson-instruction h3 {
+.lesson-sequence {
+  grid-column: 1 / -1;
   display: flex;
   align-items: center;
   gap: 12px;
-  margin: 10px 0;
-  font-size: 24px;
-  font-weight: 500;
-  min-height: 38px;
-}
-.lesson-instruction h3 > span:first-child {
-  font-size: 30px;
-  color: #355e51;
-}
-.lesson-instruction h3 .note-to-key {
-  margin-left: 8px;
-  font-size: 11px;
-  color: #566350;
-}
-.lesson-instruction h3 kbd {
-  font-size: 20px;
-  padding: 1px 12px;
-  border-color: #c1cebb;
-  color: #355e51;
-}
-.lesson-instruction p {
-  color: #566350;
-  font-size: 11px;
-  line-height: 1.7;
-  margin: 0;
-}
-.lesson-sequence {
   min-width: 0;
 }
 .lesson-progress-label {
-  display: flex;
-  justify-content: space-between;
   color: #566350;
   font-size: 10px;
+  white-space: nowrap;
 }
 .lesson-sequence progress {
   appearance: none;
   display: block;
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   height: 4px;
   border: 0;
   border-radius: 4px;
   background: #e7ebdf;
-  margin: 11px 0 16px;
   overflow: hidden;
 }
 .lesson-sequence progress::-webkit-progress-bar {
@@ -262,7 +213,6 @@
   display: flex;
   gap: 12px;
   align-items: center;
-  padding: 0 26px 20px;
   flex-wrap: wrap;
 }
 .lesson-primary,
@@ -296,20 +246,10 @@
 .loop-button.active {
   border-color: #547a62;
 }
-.lesson-actions .loop-button {
-  margin-left: auto;
-}
-.lesson-help {
-  margin: 0;
-  padding: 13px 26px;
-  border-top: 1px solid #e5e5dc;
-  color: #566350;
-  font-size: 10px;
-  line-height: 1.9;
-  background: #fafbf5;
-}
 .song-source {
-  margin: 15px 2px 0;
+  flex-basis: 100%;
+  margin: 0;
+  padding-bottom: 24px;
   font-size: 11px;
   color: #596454;
   line-height: 1.9;
@@ -343,37 +283,29 @@
 .black-key .expected-marker {
   color: #c9e4b6;
 }
+@media (max-width: 960px) {
+  .practice-controls {
+    grid-template-columns: 1fr;
+    padding: 16px 18px;
+    gap: 14px;
+  }
+  .lesson-settings {
+    justify-content: space-between;
+  }
+}
 @media (max-width: 820px) {
   .practice-heading {
     align-items: flex-start;
     flex-direction: column;
     gap: 10px;
   }
-  .lesson-toolbar {
-    align-items: flex-start;
-    flex-direction: column;
-    padding: 14px 18px;
-  }
-  .lesson-main {
-    grid-template-columns: 1fr;
-    gap: 20px;
-    padding: 20px 18px;
-  }
   .lesson-actions {
-    padding: 0 18px 18px;
     gap: 8px;
-  }
-  .lesson-help {
-    padding: 12px 18px;
   }
 }
 @media (max-width: 600px) {
   .keyboard-lesson-hint {
     padding: 12px 14px;
-  }
-  .keyboard-lesson-hint .lesson-secondary {
-    font-size: 10px;
-    padding: 8px;
   }
   .song-library {
     grid-template-columns: 1fr;
@@ -398,18 +330,33 @@
   .practice-heading h2 {
     font-size: 21px;
   }
-  .lesson-toolbar label {
+  .practice-controls {
+    padding: 16px 14px;
+  }
+  .lesson-actions {
+    flex-wrap: nowrap;
+    gap: 6px;
+  }
+  .lesson-actions button {
+    flex: 1;
+    min-height: 44px;
+    padding: 8px 6px;
     font-size: 10px;
   }
-  .listen-controls {
-    flex-wrap: wrap;
-    gap: 8px;
+  .lesson-settings {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 16px;
   }
-  .lesson-actions .loop-button {
-    margin-left: 0;
+  .lesson-settings label {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 7px;
+    font-size: 10px;
   }
-  .lesson-instruction h3 {
-    font-size: 20px;
+  .lesson-settings select {
+    width: 100%;
+    min-height: 40px;
   }
 }
 
@@ -703,12 +650,6 @@ h1 > span {
 }
 .warning .status-dot {
   background: #a27142;
-}
-.headphone-tip {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 10px;
 }
 .piano-studio {
   border-radius: 13px;
@@ -1236,7 +1177,12 @@ kbd {
   display: flex;
   align-items: center;
   gap: 22px;
+  flex-wrap: wrap;
   color: #65705c;
+}
+.site-footer:has(.song-source) {
+  padding-top: 24px;
+  row-gap: 18px;
 }
 .brand-small {
   font-size: 13px;
@@ -1544,9 +1490,6 @@ kbd {
     font-size: 9px;
     margin: 16px 0 0;
   }
-  .headphone-tip {
-    font-size: 9px;
-  }
   .site-footer {
     gap: 12px;
   }
@@ -1646,13 +1589,6 @@ kbd {
   }
   .ready-status {
     font-size: 9px;
-  }
-  .headphone-tip {
-    font-size: 0;
-    gap: 0;
-  }
-  .headphone-tip svg {
-    width: 14px;
   }
   .instrument-toolbar {
     padding: 16px 14px;

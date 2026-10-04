@@ -6,7 +6,10 @@ export const beat = async (page: Page) =>
   Number(await roll(page).getAttribute("data-playhead"));
 export async function ready(page: Page, freezeClock = true) {
   await page.goto("/");
-  await expect(page.getByText("연주할 준비가 되었어요")).toBeVisible();
+  await expect(page.locator(".piano-studio")).toHaveAttribute(
+    "data-sample-state",
+    "ready",
+  );
   await page.getByRole("button", { name: "곡 연습", exact: false }).click();
   if (!freezeClock) return;
   await page.clock.install({ time: new Date("2026-10-04T00:00:00Z") });
