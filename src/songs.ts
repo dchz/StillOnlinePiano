@@ -1,6 +1,6 @@
 export type LessonNote = {
   midi: number;
-  /** Quarter-note beats, used for listening, not timing assessment. */
+  /** Quarter-note beats for playback and the piano roll, not timing assessment. */
   beats: number;
   gapAfter?: number;
 };

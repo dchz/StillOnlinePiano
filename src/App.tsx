@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useReducer, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+} from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import {
   ArrowLeft,
@@ -24,6 +31,9 @@ import {
 import { PianoAudio } from "./audio";
 import type { SampleState } from "./audio";
 import { PracticePanel } from "./PracticePanel";
+import { FallingNotes } from "./FallingNotes";
+import "./pianoRoll.css";
+import { buildTimeline, ROLL_LEAD_BEATS } from "./pianoRoll";
 import { initialPractice, practiceReducer } from "./practice";
 import { keyboardOctaveFor, lessonNotes, SONGS } from "./songs";
 import {
@@ -96,9 +106,14 @@ export default function App() {
   );
   const practiceEnabled = useRef(false);
   const [previewing, setPreviewing] = useState(false);
+  const [previewStartedAt, setPreviewStartedAt] = useState<number | null>(null);
   const [previewSpeed, setPreviewSpeed] = useState(1);
   const song = SONGS.find((item) => item.id === practice.songId)!;
-  const notes = lessonNotes(song, practice.section);
+  const notes = useMemo(
+    () => lessonNotes(song, practice.section),
+    [song, practice.section],
+  );
+  const allSongNotes = useMemo(() => lessonNotes(song, null), [song]);
   const expectedNote =
     mode === "practice" ? notes[practice.cursor]?.midi : undefined;
   const audio = useRef<PianoAudio | null>(null);
@@ -131,6 +146,7 @@ export default function App() {
     audio.current?.performance.stop("demo:");
     setPlaying(false);
     setPreviewing(false);
+    setPreviewStartedAt(null);
   }, []);
 
   const panic = useCallback(() => {
@@ -230,8 +246,9 @@ export default function App() {
     if (viewport && target) {
       const box = target.getBoundingClientRect();
       const area = viewport.getBoundingClientRect();
-      viewport.scrollLeft +=
-        box.left + box.width / 2 - area.left - area.width / 2;
+      if (box.left < area.left + 8 || box.right > area.right - 8)
+        viewport.scrollLeft +=
+          box.left + box.width / 2 - area.left - area.width / 2;
     }
   }, [expectedNote, octave]);
 
@@ -269,25 +286,30 @@ export default function App() {
     )
       return;
     setPreviewing(true);
-    let time = 0;
     const beatMs = 60000 / (song.bpm * previewSpeed);
-    notes.forEach((note, index) => {
-      const id = `demo:lesson:${index}`;
+    const timeline = buildTimeline(notes);
+    setPreviewStartedAt(performance.now());
+    timeline.entries.forEach((note) => {
+      const id = `demo:lesson:${note.index}`;
       timers.current.push(
         setTimeout(
           () => audio.current?.performance.noteOn(id, note.midi, 0.65, "demo"),
-          time,
+          (ROLL_LEAD_BEATS + note.start) * beatMs,
         ),
       );
       timers.current.push(
         setTimeout(
           () => audio.current?.performance.noteOff(id),
-          time + note.beats * beatMs * 0.92,
+          (ROLL_LEAD_BEATS + note.start + note.beats * 0.92) * beatMs,
         ),
       );
-      time += (note.beats + (note.gapAfter ?? 0)) * beatMs;
     });
-    timers.current.push(setTimeout(stopDemo, time));
+    timers.current.push(
+      setTimeout(stopDemo, (ROLL_LEAD_BEATS + timeline.duration) * beatMs),
+    );
+    keyboardViewport.current
+      ?.closest(".piano-studio")
+      ?.scrollIntoView({ block: "center" });
   };
 
   useEffect(() => {
@@ -471,8 +493,21 @@ export default function App() {
     panic();
     guide.current?.showModal();
   };
-  const firstNote = octave * 12;
-  const keys = Array.from({ length: 37 }, (_, i) => firstNote + i);
+  // Keep the score and physical key positions fixed while typing labels change octave.
+  const firstNote =
+    mode === "practice"
+      ? Math.floor(Math.min(...allSongNotes.map((note) => note.midi)) / 12) * 12
+      : octave * 12;
+  const lastNote =
+    mode === "practice"
+      ? Math.ceil(
+          (Math.max(...allSongNotes.map((note) => note.midi)) + 1) / 12,
+        ) * 12
+      : firstNote + 36;
+  const keys = Array.from(
+    { length: lastNote - firstNote + 1 },
+    (_, i) => firstNote + i,
+  );
   const whiteKeys = keys.filter((note) => !isBlack(note));
   const base = (octave + 1) * 12;
   const VolumeIcon = volume === 0 ? VolumeX : volume < 45 ? Volume1 : Volume2;
@@ -498,7 +533,7 @@ export default function App() {
         aria-pressed={activeNotes.includes(note)}
         data-expected={expectedNote === note ? "true" : undefined}
         tabIndex={-1}
-        className={`piano-key ${black ? "black-key" : "white-key"} ${activeNotes.includes(note) ? "pressed" : ""} ${expectedNote === note ? "expected-key" : ""} ${note === 60 ? "middle-c" : ""}`}
+        className={`piano-key ${black ? "black-key" : "white-key"} ${activeNotes.includes(note) ? "pressed" : ""} ${expectedNote === note && !previewing ? "expected-key" : ""} ${note === 60 ? "middle-c" : ""}`}
         style={
           black
             ? {
@@ -525,7 +560,7 @@ export default function App() {
           {!black && note % 12 === 0 ? noteName(note) : ""}
         </span>
         {note === 60 && <span className="middle-c-dot" />}
-        {expectedNote === note && (
+        {expectedNote === note && !previewing && (
           <span className="expected-marker" aria-label="다음 연습 음">
             ●
           </span>
@@ -696,17 +731,23 @@ export default function App() {
                     {song.title} · {practice.cursor}/{notes.length}음
                   </span>
                   <span className="keyboard-lesson-target">
-                    {practice.status === "complete" ? (
+                    {practice.status === "complete" && !previewing ? (
                       "완주! 멋진 연주였어요."
                     ) : (
                       <>
                         {previewing
-                          ? "미리 듣는 중 · 연습할 음"
+                          ? "미리 듣기"
                           : practice.status === "paused"
                             ? "일시정지 · 다음 음"
                             : "다음 음"}
-                        <strong>{noteName(expectedNote!)}</strong>
-                        <kbd>{KEY_LABELS[expectedNote! - base]}</kbd>
+                        <strong>
+                          {previewing
+                            ? activeNotes.map(noteName).join(" · ") || "♪"
+                            : noteName(expectedNote!)}
+                        </strong>
+                        {!previewing && (
+                          <kbd>{KEY_LABELS[expectedNote! - base]}</kbd>
+                        )}
                       </>
                     )}
                   </span>
@@ -761,15 +802,40 @@ export default function App() {
                 }}
               >
                 <div
-                  className="piano-keyboard"
-                  onPointerDown={pointerDown}
-                  onPointerMove={pointerMove}
-                  onPointerUp={pointerUp}
-                  onPointerCancel={pointerUp}
-                  onLostPointerCapture={pointerUp}
+                  className={
+                    mode === "practice" ? "practice-keyboard-track" : undefined
+                  }
                 >
-                  {whiteKeys.map(renderKey)}
-                  {keys.filter(isBlack).map(renderKey)}
+                  {mode === "practice" && (
+                    <FallingNotes
+                      key={`${song.id}:${practice.section ?? "all"}`}
+                      notes={notes}
+                      keys={keys}
+                      state={practice}
+                      bpm={song.bpm}
+                      speed={previewSpeed}
+                      previewStartedAt={previewStartedAt}
+                      activeNotes={activeNotes}
+                    />
+                  )}
+                  <div
+                    className="piano-keyboard"
+                    style={
+                      mode === "practice"
+                        ? ({
+                            "--black-width": `${(0.62 / whiteKeys.length) * 100}%`,
+                          } as React.CSSProperties)
+                        : undefined
+                    }
+                    onPointerDown={pointerDown}
+                    onPointerMove={pointerMove}
+                    onPointerUp={pointerUp}
+                    onPointerCancel={pointerUp}
+                    onLostPointerCapture={pointerUp}
+                  >
+                    {whiteKeys.map(renderKey)}
+                    {keys.filter(isBlack).map(renderKey)}
+                  </div>
                 </div>
               </div>
               <div className="piano-front" />
@@ -796,7 +862,7 @@ export default function App() {
                   <ArrowRight size={14} />
                 </button>
                 <span className="octave-range">
-                  {noteName(firstNote)} – {noteName(firstNote + 36)}
+                  {noteName(firstNote)} – {noteName(lastNote)}
                 </span>
               </div>
               <button
@@ -936,8 +1002,9 @@ export default function App() {
               <Piano size={18} /> 곡 연습
             </h3>
             <p>
-              ‘곡 연습’에서 곡과 구간을 선택하고 연습을 시작하세요. 표시된 음을
-              누르면 다음 음으로 넘어갑니다. 키보드·터치·MIDI로 연습할 수
+              ‘곡 연습’에서 곡과 구간을 선택하고 연습을 시작하세요. 위에서
+              내려오는 막대가 건반 위 선에 닿으면 해당 건반을 누르세요. 맞는
+              음을 누를 때까지 기다려 줍니다. 키보드·터치·MIDI로 연습할 수
               있어요.
             </p>
             <p>

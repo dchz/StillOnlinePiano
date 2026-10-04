@@ -41,7 +41,6 @@ export function PracticePanel({
   const notes = lessonNotes(song, state.section);
   const next = notes[state.cursor];
   const keyLabel = next ? KEY_LABELS[next.midi - (octave + 1) * 12] : undefined;
-  const windowStart = Math.max(0, Math.min(state.cursor - 1, notes.length - 7));
   const choose = (action: PracticeAction) => {
     onStop();
     dispatch(action);
@@ -107,7 +106,7 @@ export function PracticePanel({
           </label>
           <div className="listen-controls">
             <label>
-              듣기 속도
+              진행 속도
               <select
                 value={speed}
                 onChange={(event) => {
@@ -115,6 +114,7 @@ export function PracticePanel({
                   onSpeed(Number(event.target.value));
                 }}
               >
+                <option value={0.5}>0.5배</option>
                 <option value={0.75}>0.75배</option>
                 <option value={1}>1배</option>
                 <option value={1.25}>1.25배</option>
@@ -188,29 +188,6 @@ export function PracticePanel({
               value={state.cursor}
               max={notes.length}
             />
-            <ol className="note-sequence" aria-label="선율 순서">
-              {notes.slice(windowStart, windowStart + 7).map((note, index) => {
-                const position = windowStart + index;
-                return (
-                  <li
-                    key={position}
-                    aria-current={
-                      position === state.cursor ? "step" : undefined
-                    }
-                    className={
-                      position < state.cursor
-                        ? "note-done"
-                        : position === state.cursor
-                          ? "note-current"
-                          : ""
-                    }
-                  >
-                    <small>{position + 1}</small>
-                    <span>{noteName(note.midi)}</span>
-                  </li>
-                );
-              })}
-            </ol>
           </div>
         </div>
 
@@ -251,8 +228,9 @@ export function PracticePanel({
           </button>
         </div>
         <p className="lesson-help">
-          음높이와 순서를 익히는 연습이에요. 박자·누르는 길이는 채점하지 않아요.
-          컴퓨터 키보드 음역은 다음 음에 맞춰 자동으로 이동해요.
+          막대가 건반 위 선에 닿으면 해당 건반을 눌러 주세요. 긴 막대는 길게
+          이어지는 음이에요. 맞는 음을 누를 때까지 기다려요. 박자·누르는 길이는
+          채점하지 않아요.
         </p>
       </div>
 

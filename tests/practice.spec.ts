@@ -12,6 +12,7 @@ async function ready(page: Page) {
 async function playExpected(page: Page, note: number) {
   const target = page.locator('.piano-key[data-expected="true"]');
   await expect(target).toHaveAttribute("data-note", String(note));
+  await expect(target.locator(".key-label")).not.toHaveText("");
   const label = await target.locator(".key-label").innerText();
   expect(label).not.toBe("");
   await page.keyboard.press(label.toLowerCase());
@@ -91,7 +92,7 @@ test("preview produces audio notes without advancing practice and cancels cleanl
   await page.getByRole("button", { name: "선율 미리 듣기" }).click();
   await expect(page.getByRole("button", { name: "듣기 멈추기" })).toBeVisible();
   await expect
-    .poll(() => page.locator(".piano-key.pressed").count())
+    .poll(() => page.locator(".piano-key.pressed").count(), { intervals: [50] })
     .toBeGreaterThan(0);
   await expect(progress(page)).toHaveAttribute("value", "0");
   await page.keyboard.press(";");
