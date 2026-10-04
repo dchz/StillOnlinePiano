@@ -21,7 +21,6 @@ export function SongLibrary({ state, dispatch, onStop }: PracticeProps) {
     <section className="practice-section" aria-labelledby="practice-title">
       <div className="practice-heading">
         <div>
-          <p className="eyebrow">A MELODY AT A TIME</p>
           <h2 id="practice-title">아는 멜로디가, 나의 연주로.</h2>
         </div>
         <span className="pd-label">퍼블릭 도메인 원곡 · 2곡</span>

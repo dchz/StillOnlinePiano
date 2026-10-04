@@ -577,11 +577,27 @@ export default function App() {
         </button>
       </header>
       <main>
+        <div className="mode-heading">
+          <p className="eyebrow">
+            <span /> A LITTLE ROOM FOR YOUR MUSIC
+          </p>
+          <div className="mode-switch" role="group" aria-label="연주 모드">
+            <button
+              aria-pressed={mode === "free"}
+              onClick={() => switchMode("free")}
+            >
+              자유 연주
+            </button>
+            <button
+              aria-pressed={mode === "practice"}
+              onClick={() => switchMode("practice")}
+            >
+              곡 연습 <span>NEW</span>
+            </button>
+          </div>
+        </div>
         <section className="intro" aria-labelledby="main-title">
           <div className="intro-copy">
-            <p className="eyebrow">
-              <span /> A LITTLE ROOM FOR YOUR MUSIC
-            </p>
             <h1 id="main-title">
               오늘의 마음을,
               <br />
@@ -624,20 +640,6 @@ export default function App() {
           </div>
         </section>
 
-        <div className="mode-switch" role="group" aria-label="연주 모드">
-          <button
-            aria-pressed={mode === "free"}
-            onClick={() => switchMode("free")}
-          >
-            자유 연주
-          </button>
-          <button
-            aria-pressed={mode === "practice"}
-            onClick={() => switchMode("practice")}
-          >
-            곡 연습 <span>NEW</span>
-          </button>
-        </div>
         {mode === "practice" && (
           <SongLibrary
             state={practice}

@@ -3,12 +3,18 @@
 @import "@fontsource/dm-sans/latin-600.css";
 @import "@fontsource/noto-serif-kr/400.css";
 
+.mode-heading {
+  padding: 51px 0 26px;
+}
+.mode-heading .eyebrow {
+  margin-bottom: 18px;
+}
 .mode-switch {
   display: flex;
   gap: 5px;
   width: fit-content;
   padding: 5px;
-  margin: 0 0 26px;
+  margin: 0;
   border: 1px solid #dce0d5;
   border-radius: 9px;
   background: #efefe7;
@@ -33,9 +39,6 @@
 }
 .practice-mode .intro {
   display: none;
-}
-.practice-mode .mode-switch {
-  margin-top: 28px;
 }
 .keyboard-lesson-hint {
   display: flex;
@@ -71,9 +74,6 @@
   align-items: center;
   gap: 16px;
   margin-bottom: 21px;
-}
-.practice-heading .eyebrow {
-  margin-bottom: 10px;
 }
 .practice-heading h2 {
   font: 400 25px var(--serif);
@@ -523,7 +523,7 @@ main {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 51px 0 46px;
+  padding: 0 0 46px;
 }
 .eyebrow {
   font-size: 10px;
@@ -1367,8 +1367,10 @@ kbd {
   .site-shell {
     padding: 0 74px;
   }
-  .intro {
+  .mode-heading {
     padding-top: 64px;
+  }
+  .intro {
     padding-bottom: 56px;
   }
   h1 {
@@ -1411,8 +1413,11 @@ kbd {
   .header-tagline {
     display: none;
   }
+  .mode-heading {
+    padding-top: 38px;
+  }
   .intro {
-    padding: 38px 0;
+    padding: 0 0 38px;
   }
   .intro-aside {
     min-width: 270px;
@@ -1523,8 +1528,14 @@ kbd {
   .guide-button > svg:last-child {
     display: none;
   }
+  .mode-heading {
+    padding-top: 32px;
+  }
+  .mode-heading .eyebrow {
+    margin-bottom: 16px;
+  }
   .intro {
-    padding: 32px 0 31px;
+    padding: 0 0 31px;
     align-items: flex-start;
     gap: 16px;
   }
