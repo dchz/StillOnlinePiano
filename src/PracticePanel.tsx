@@ -1,7 +1,6 @@
 import {
   Check,
   ChevronRight,
-  Headphones,
   Pause,
   Play,
   Repeat2,
@@ -16,26 +15,22 @@ type Props = {
   state: PracticeState;
   dispatch: Dispatch<PracticeAction>;
   octave: number;
-  previewing: boolean;
   speed: number;
   disabled: boolean;
   onSpeed: (speed: number) => void;
   onStart: () => void;
   onStop: () => void;
-  onPreview: () => void;
 };
 
 export function PracticePanel({
   state,
   dispatch,
   octave,
-  previewing,
   speed,
   disabled,
   onSpeed,
   onStart,
   onStop,
-  onPreview,
 }: Props) {
   const song = SONGS.find((item) => item.id === state.songId)!;
   const notes = lessonNotes(song, state.section);
@@ -110,7 +105,6 @@ export function PracticePanel({
               <select
                 value={speed}
                 onChange={(event) => {
-                  onStop();
                   onSpeed(Number(event.target.value));
                 }}
               >
@@ -120,14 +114,6 @@ export function PracticePanel({
                 <option value={1.25}>1.25배</option>
               </select>
             </label>
-            <button
-              className="lesson-secondary"
-              onClick={onPreview}
-              disabled={disabled}
-            >
-              <Headphones size={15} />
-              {previewing ? "듣기 멈추기" : "선율 미리 듣기"}
-            </button>
           </div>
         </div>
 
@@ -135,30 +121,26 @@ export function PracticePanel({
           <div
             className="lesson-instruction"
             role="status"
-            aria-live="polite"
+            aria-live={state.status === "practicing" ? "off" : "polite"}
             aria-atomic="true"
           >
             {state.status === "complete" ? (
               <>
-                <span className="lesson-kicker">WELL PLAYED</span>
-                <h3>선율을 끝까지 연주했어요!</h3>
-                <p>
-                  {notes.length}음 완주 · 다른 음 {state.mistakes}회
-                </p>
+                <span className="lesson-kicker">PLAYBACK COMPLETE</span>
+                <h3>선율 재생이 끝났어요!</h3>
+                <p>{notes.length}음 재생 완료 · 다시 따라 연주해 보세요.</p>
               </>
             ) : (
               <>
                 <span className="lesson-kicker">
-                  {previewing
-                    ? "선율을 듣고 있어요"
-                    : state.status === "paused"
-                      ? "잠시 쉬는 중"
-                      : state.status === "practicing"
-                        ? "다음 음을 눌러 주세요"
-                        : "준비되면 연습을 시작하세요"}
+                  {state.status === "paused"
+                    ? "잠시 쉬는 중"
+                    : state.status === "practicing"
+                      ? "음악에 맞춰 따라 연주하세요"
+                      : "준비되면 연습을 시작하세요"}
                 </span>
                 <h3>
-                  <span>{noteName(next.midi)}</span>
+                  <span>{next ? noteName(next.midi) : "쉼"}</span>
                   {keyLabel && (
                     <>
                       <span className="note-to-key">키보드</span>
@@ -166,11 +148,7 @@ export function PracticePanel({
                     </>
                   )}
                 </h3>
-                <p>
-                  {state.mistakes > 0
-                    ? "괜찮아요. 표시된 음을 천천히 찾아보세요."
-                    : "맞는 음을 누를 때까지 기다려 드릴게요."}
-                </p>
+                <p>건반을 누르지 않아도 음악과 음표는 계속 진행돼요.</p>
               </>
             )}
           </div>
@@ -180,7 +158,7 @@ export function PracticePanel({
                 {state.cursor} / {notes.length}음
               </span>
               <span>
-                {state.laps > 0 ? `${state.laps}회 완주` : "나의 속도로"}
+                {state.laps > 0 ? `${state.laps}회 재생` : "자동 재생"}
               </span>
             </div>
             <progress
@@ -229,8 +207,8 @@ export function PracticePanel({
         </div>
         <p className="lesson-help">
           막대가 건반 위 선에 닿으면 해당 건반을 눌러 주세요. 긴 막대는 길게
-          이어지는 음이에요. 맞는 음을 누를 때까지 기다려요. 박자·누르는 길이는
-          채점하지 않아요.
+          이어지는 음이에요. 음악은 입력과 관계없이 자동으로 재생돼요. 편하게
+          따라 연주해 보세요. 연주를 채점하지 않아요.
         </p>
       </div>
 

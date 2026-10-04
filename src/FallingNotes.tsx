@@ -2,8 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { isBlack, noteName } from "./music";
 import type { PracticeState } from "./practice";
 import type { LessonNote } from "./songs";
+import type { LessonPlayer } from "./lessonPlayer";
 import {
-  advancePracticeBeat,
   buildTimeline,
   pianoKeyGeometry,
   ROLL_LEAD_BEATS,
@@ -14,9 +14,7 @@ type Props = {
   notes: LessonNote[];
   keys: number[];
   state: PracticeState;
-  bpm: number;
-  speed: number;
-  previewStartedAt: number | null;
+  player: LessonPlayer;
   activeNotes: number[];
 };
 
@@ -24,18 +22,12 @@ export function FallingNotes({
   notes,
   keys,
   state,
-  bpm,
-  speed,
-  previewStartedAt,
+  player,
   activeNotes,
 }: Props) {
   const timeline = useMemo(() => buildTimeline(notes), [notes]);
   const root = useRef<HTMLDivElement>(null);
   const layer = useRef<HTMLDivElement>(null);
-  const practiceBeat = useRef(-ROLL_LEAD_BEATS);
-  const previous = useRef({ cursor: 0, laps: 0 });
-  const [waiting, setWaiting] = useState(false);
-  const [previewIndex, setPreviewIndex] = useState(-1);
   const [reducedMotion, setReducedMotion] = useState(
     () => window.matchMedia("(prefers-reduced-motion: reduce)").matches,
   );
@@ -49,111 +41,45 @@ export function FallingNotes({
 
   useEffect(() => {
     let frame = 0;
-    const goal = timeline.entries[state.cursor]?.start ?? timeline.duration;
-    if (
-      state.status === "ready" ||
-      state.laps !== previous.current.laps ||
-      state.cursor < previous.current.cursor
-    ) {
-      practiceBeat.current = -ROLL_LEAD_BEATS;
-    }
-    // Early correct notes are accepted in this pitch-only practice mode.
-    // Catch up to their onset so a played note never remains in the future.
-    if (state.cursor > previous.current.cursor) {
-      practiceBeat.current = Math.max(
-        practiceBeat.current,
-        timeline.entries[state.cursor - 1]?.start ?? 0,
-      );
-    }
-    if (state.status === "complete")
-      practiceBeat.current = timeline.duration + 1;
-    previous.current = { cursor: state.cursor, laps: state.laps };
-    let lastFrame = performance.now();
-    let shownPreviewIndex = -1;
-    setWaiting(false);
-    setPreviewIndex(-1);
-
-    const paint = (beat: number, motion: string) => {
+    const paint = () => {
+      const position =
+        state.status === "ready"
+          ? { ...player.position, beat: -ROLL_LEAD_BEATS, status: "ready" }
+          : player.position;
+      const beat =
+        reducedMotion && position.status !== "complete"
+          ? (timeline.entries
+              .filter((entry) => entry.start <= position.beat)
+              .at(-1)?.start ?? -ROLL_LEAD_BEATS)
+          : position.beat;
       layer.current?.style.setProperty(
         "--roll-offset",
         `${beat * ROLL_PIXELS_PER_BEAT}px`,
       );
       if (root.current) {
-        root.current.dataset.playhead = beat.toFixed(3);
-        root.current.dataset.motion = motion;
+        root.current.dataset.playhead = position.beat.toFixed(3);
+        root.current.dataset.motion =
+          position.status === "practicing" ? "moving" : position.status;
       }
+      if (state.status === "practicing") frame = requestAnimationFrame(paint);
     };
-    const tick = (now: number) => {
-      if (previewStartedAt !== null) {
-        const beat =
-          ((now - previewStartedAt) / 1000) * ((bpm * speed) / 60) -
-          ROLL_LEAD_BEATS;
-        let index = -1;
-        for (const entry of timeline.entries) {
-          if (entry.start > beat) break;
-          index = entry.index;
-        }
-        if (index !== shownPreviewIndex) {
-          shownPreviewIndex = index;
-          setPreviewIndex(index);
-        }
-        // Reduced motion keeps the same audio clock, displaying discrete positions.
-        paint(
-          reducedMotion
-            ? (timeline.entries[index]?.start ?? -ROLL_LEAD_BEATS)
-            : beat,
-          "preview",
-        );
-        frame = requestAnimationFrame(tick);
-      } else if (state.status === "practicing") {
-        practiceBeat.current = reducedMotion
-          ? goal
-          : advancePracticeBeat(
-              practiceBeat.current,
-              (now - lastFrame) / 1000,
-              (bpm * speed) / 60,
-              goal,
-            );
-        const atLine = practiceBeat.current >= goal;
-        paint(practiceBeat.current, atLine ? "waiting" : "moving");
-        if (atLine) setWaiting(true);
-        if (!atLine) frame = requestAnimationFrame(tick);
-      }
-      lastFrame = now;
-    };
-
-    paint(practiceBeat.current, state.status);
-    if (previewStartedAt !== null || state.status === "practicing")
-      frame = requestAnimationFrame(tick);
+    paint();
     return () => cancelAnimationFrame(frame);
-  }, [
-    timeline,
-    state.cursor,
-    state.laps,
-    state.status,
-    bpm,
-    speed,
-    previewStartedAt,
-    reducedMotion,
-  ]);
+  }, [player, timeline, reducedMotion, state.status]);
 
-  const current = previewStartedAt !== null ? previewIndex : state.cursor;
+  const current = state.cursor;
   const upcoming = timeline.entries
     .slice(state.cursor, state.cursor + 7)
     .map((entry) => noteName(entry.midi))
     .join(", ");
   const status =
-    previewStartedAt !== null
-      ? "미리 듣기 · 막대가 선에 닿으면 소리가 나요"
-      : state.status === "complete"
-        ? "선율을 끝까지 연주했어요"
-        : state.status === "paused"
-          ? "일시정지 · 이어서 연습할 수 있어요"
-          : state.status === "ready"
-            ? "연습을 시작하면 음표가 내려와요"
-            : waiting
-              ? "표시된 건반을 눌러 주세요"
-              : "막대가 건반에 닿을 때 연주하세요";
+    state.status === "complete"
+      ? "선율 재생이 끝났어요"
+      : state.status === "paused"
+        ? "일시정지 · 이어서 연습할 수 있어요"
+        : state.status === "ready"
+          ? "연습을 시작하면 음악이 자동으로 재생돼요"
+          : "자동 재생 중 · 내려오는 음표에 맞춰 연주하세요";
 
   return (
     <div
@@ -182,7 +108,7 @@ export function FallingNotes({
               key={entry.index}
               data-roll-index={entry.index}
               data-roll-note={entry.midi}
-              className={`falling-note ${isBlack(entry.midi) ? "falling-note-black" : ""} ${entry.index === current ? "falling-note-current" : ""} ${previewStartedAt === null && entry.index < state.cursor ? "falling-note-played" : ""}`}
+              className={`falling-note ${isBlack(entry.midi) ? "falling-note-black" : ""} ${entry.index === current ? "falling-note-current" : ""} ${entry.index < state.cursor ? "falling-note-played" : ""}`}
               style={{
                 left: `${geometry.center}%`,
                 width: `${geometry.width * 0.78}%`,
@@ -196,9 +122,7 @@ export function FallingNotes({
         })}
       </div>
       <div className="roll-status" aria-hidden="true">
-        <span
-          className={waiting ? "roll-status-dot waiting" : "roll-status-dot"}
-        />
+        <span className="roll-status-dot" />
         {status}
       </div>
       <div className="roll-hit-line" aria-hidden="true" />

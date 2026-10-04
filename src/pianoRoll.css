@@ -120,10 +120,6 @@
   background: #c9b582;
   flex-shrink: 0;
 }
-.roll-status-dot.waiting {
-  background: #f8d478;
-  box-shadow: 0 0 8px #ffd06d99;
-}
 .roll-hit-line {
   position: absolute;
   bottom: 0;

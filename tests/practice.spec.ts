@@ -1,114 +1,177 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { lessonNotes, SONGS } from "../src/songs";
+import { buildTimeline, ROLL_LEAD_BEATS } from "../src/pianoRoll";
+import { beat, progress, ready, roll, start } from "./practice-helpers";
 
-const progress = (page: Page) =>
-  page.getByRole("progressbar", { name: "연습 진행" });
-async function ready(page: Page) {
-  await page.goto("/");
-  await expect(page.getByText("연주할 준비가 되었어요")).toBeVisible();
-  await page.getByRole("button", { name: "곡 연습", exact: false }).click();
-}
-async function playExpected(page: Page, note: number) {
-  const target = page.locator('.piano-key[data-expected="true"]');
-  await expect(target).toHaveAttribute("data-note", String(note));
-  await expect(target.locator(".key-label")).not.toHaveText("");
-  const label = await target.locator(".key-label").innerText();
-  expect(label).not.toBe("");
-  await page.keyboard.press(label.toLowerCase());
-}
-
-test("waits for the right note, pauses on focus loss, and resumes at the same position", async ({
+test("automatically produces real audio and advances while correct, wrong and held keys leave the clock unchanged", async ({
   page,
 }) => {
+  await page.addInitScript(() => {
+    const original = AudioContext.prototype.createDynamicsCompressor;
+    AudioContext.prototype.createDynamicsCompressor = function () {
+      const compressor = original.call(this);
+      const meter = this.createAnalyser();
+      compressor.connect(meter);
+      (window as any).__audioMeter = meter;
+      return compressor;
+    };
+  });
   await ready(page);
-  await page.getByRole("button", { name: "연습 시작", exact: true }).click();
-  await page.keyboard.press("a");
-  await expect(progress(page)).toHaveAttribute("value", "0");
-  await playExpected(page, 76);
+  await start(page);
+  await page.clock.runFor(1700);
+  await expect(page.locator('[data-note="76"]')).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  expect(Math.abs(await beat(page))).toBeLessThan(0.06);
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const meter: AnalyserNode = (window as any).__audioMeter;
+        const samples = new Float32Array(meter.fftSize);
+        meter.getFloatTimeDomainData(samples);
+        return Math.max(...samples.map(Math.abs));
+      }),
+    )
+    .toBeGreaterThan(0.01);
+  const before = await beat(page);
+  await page.keyboard.press(";"); // Same pitch as the automatic note.
+  await page.keyboard.down("a"); // Wrong pitch, held over the next onset.
+  expect(await beat(page)).toBe(before);
+  await expect(page.locator('[data-note="76"]')).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await page.clock.runFor(250);
   await expect(progress(page)).toHaveAttribute("value", "1");
-  await page.evaluate(() => window.dispatchEvent(new Event("blur")));
-  await expect(page.getByRole("button", { name: "이어서 연습" })).toBeVisible();
-  await page.keyboard.press("p");
-  await expect(progress(page)).toHaveAttribute("value", "1");
-  await page.getByRole("button", { name: "이어서 연습" }).click();
-  await playExpected(page, 75);
-  await expect(progress(page)).toHaveAttribute("value", "2");
-  await page.getByRole("button", { name: "사용 가이드" }).click();
-  await page.keyboard.press(";");
-  await page.keyboard.press("Escape");
-  await expect(progress(page)).toHaveAttribute("value", "2");
-  await expect(page.getByRole("button", { name: "이어서 연습" })).toBeVisible();
+  await expect(page.locator('[data-note="75"]')).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await page.keyboard.up("a");
+  await page.clock.runFor(600);
+  expect(await beat(page)).toBeGreaterThan(0.9);
+  await expect(roll(page)).toHaveAttribute("data-motion", "moving");
 });
 
 for (const song of SONGS) {
-  test(`completes ${song.id} using the displayed keyboard mapping`, async ({
+  test(`finishes ${song.id} without any piano input and can restart`, async ({
     page,
   }) => {
+    test.setTimeout(60000);
     await ready(page);
     await page.getByRole("button", { name: new RegExp(song.title) }).click();
-    await page.getByRole("button", { name: "연습 시작", exact: true }).click();
-    for (const [index, note] of lessonNotes(song, null).entries()) {
-      await playExpected(page, note.midi);
-      await expect(progress(page)).toHaveAttribute("value", String(index + 1));
-    }
-    await expect(page.getByText("선율을 끝까지 연주했어요!")).toBeVisible();
-    await expect(page.locator(".piano-key.expected-key")).toHaveCount(0);
-    await page.getByRole("button", { name: "다시 연습", exact: true }).click();
+    await start(page);
+    const notes = lessonNotes(song, null);
+    const totalMs =
+      ((ROLL_LEAD_BEATS + buildTimeline(notes).duration) * 60000) / song.bpm;
+    await page.clock.runFor(totalMs - 100);
+    await expect(
+      page.getByRole("button", { name: "일시정지", exact: true }),
+    ).toBeVisible();
+    await page.clock.runFor(150);
+    await expect(
+      page.getByText("선율 재생이 끝났어요!", { exact: true }),
+    ).toBeVisible();
+    await expect(progress(page)).toHaveAttribute("value", String(notes.length));
+    await expect(page.locator(".piano-key.pressed")).toHaveCount(0);
+    await start(page, "다시 연습");
     await expect(progress(page)).toHaveAttribute("value", "0");
+    expect(await beat(page)).toBe(-2);
   });
 }
 
-test("section repeat restarts the selected phrase and changing songs clears progress", async ({
+test("pause and focus loss freeze audio and position, then resume at the same musical moment", async ({
+  page,
+}) => {
+  await ready(page);
+  await page.getByRole("button", { name: /짐노페디 1번/ }).click();
+  await start(page);
+  await page.clock.runFor(2100);
+  await page.getByRole("button", { name: "일시정지", exact: true }).click();
+  const paused = await beat(page);
+  await expect(page.locator(".piano-key.pressed")).toHaveCount(0);
+  await page.clock.runFor(5000);
+  expect(await beat(page)).toBe(paused);
+  await start(page, "이어서 연습");
+  await expect(page.locator('[data-note="78"]')).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await page.clock.runFor(300);
+  expect(await beat(page)).toBeGreaterThan(paused + 0.3);
+  await page.evaluate(() => window.dispatchEvent(new Event("blur")));
+  await expect(roll(page)).toHaveAttribute("data-motion", "paused");
+  const blurred = await beat(page);
+  await page.clock.runFor(5000);
+  expect(await beat(page)).toBe(blurred);
+  await start(page, "이어서 연습");
+  await page.getByRole("button", { name: "사용 가이드" }).click();
+  await expect(roll(page)).toHaveAttribute("data-motion", "paused");
+  await page.keyboard.press("Escape");
+  await expect(
+    page.getByRole("button", { name: "이어서 연습", exact: true }),
+  ).toBeVisible();
+});
+
+test("speed changes preserve position and continuously adjust both the audio and visual clock", async ({
+  page,
+}) => {
+  await ready(page);
+  await start(page);
+  await page.clock.runFor(1000);
+  expect(await beat(page)).toBeCloseTo(-0.8, 1);
+  const before = await beat(page);
+  await page.getByLabel("진행 속도").selectOption("0.5");
+  expect(Math.abs((await beat(page)) - before)).toBeLessThan(0.03);
+  await page.clock.runFor(1000);
+  expect(await beat(page)).toBeCloseTo(-0.2, 1);
+  await page.clock.runFor(400);
+  await expect(page.locator('[data-note="76"]')).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await expect(
+    page.getByRole("button", { name: "일시정지", exact: true }),
+  ).toBeVisible();
+});
+
+test("repeats only the selected section automatically, and reset or selection cancels old playback", async ({
   page,
 }) => {
   await ready(page);
   await page.getByLabel("연습 구간").selectOption("0");
   await page.getByRole("button", { name: "선택 구간 반복" }).click();
-  await page.getByRole("button", { name: "연습 시작", exact: true }).click();
-  for (const note of SONGS[0].sections[0].notes)
-    await playExpected(page, note.midi);
-  await expect(progress(page)).toHaveAttribute("value", "0");
-  await expect(page.getByText("1회 완주", { exact: true })).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "일시정지", exact: true }),
-  ).toBeVisible();
+  await start(page);
+  const timeline = buildTimeline(SONGS[0].sections[0].notes);
+  await page.clock.runFor(
+    ((2 + timeline.duration) * 60000) / SONGS[0].bpm + 100,
+  );
+  await expect(page.getByText("1회 재생", { exact: true })).toBeVisible();
+  expect(await beat(page)).toBeLessThan(-1.8);
+  await page.getByRole("button", { name: "처음부터", exact: true }).click();
+  await page.clock.runFor(3000);
+  expect(await beat(page)).toBe(-2);
+  await expect(page.locator(".piano-key.pressed")).toHaveCount(0);
+  await start(page);
+  await page.clock.runFor(1700);
   await page.getByRole("button", { name: /짐노페디 1번/ }).click();
   await expect(page.getByLabel("연습 구간")).toHaveValue("all");
   await expect(
-    page.getByRole("button", { name: "연습 시작", exact: true }),
-  ).toBeVisible();
-  await expect(
     page.getByRole("button", { name: "선택 구간 반복" }),
   ).toHaveAttribute("aria-pressed", "false");
-});
-
-test("preview produces audio notes without advancing practice and cancels cleanly", async ({
-  page,
-}) => {
-  await ready(page);
-  await page.getByLabel("연습 구간").selectOption("0");
-  await page.getByRole("button", { name: "연습 시작", exact: true }).click();
-  await page.getByRole("button", { name: "선율 미리 듣기" }).click();
-  await expect(page.getByRole("button", { name: "듣기 멈추기" })).toBeVisible();
-  await expect
-    .poll(() => page.locator(".piano-key.pressed").count(), { intervals: [50] })
-    .toBeGreaterThan(0);
+  await page.clock.runFor(3000);
   await expect(progress(page)).toHaveAttribute("value", "0");
-  await page.keyboard.press(";");
-  await expect(
-    page.getByRole("button", { name: "선율 미리 듣기" }),
-  ).toBeVisible();
-  await expect(progress(page)).toHaveAttribute("value", "0");
-  await expect(page.getByRole("button", { name: "이어서 연습" })).toBeVisible();
-  await page.getByRole("button", { name: "선율 미리 듣기" }).click();
-  await page.getByRole("button", { name: "자유 연주", exact: true }).click();
   await expect(page.locator(".piano-key.pressed")).toHaveCount(0);
-  await page.getByRole("button", { name: "곡 연습", exact: false }).click();
-  await expect(progress(page)).toHaveAttribute("value", "0");
+  await start(page);
+  await page.clock.runFor(1700);
+  await page.getByRole("button", { name: "자유 연주", exact: true }).click();
+  await page.clock.runFor(3000);
+  await expect(page.locator(".piano-key.pressed")).toHaveCount(0);
 });
 
-test("MIDI note-on advances practice, while note-off and pedals do not", async ({
+test("MIDI note-on, note-off and pedals leave automatic music playing", async ({
   page,
 }) => {
   await page.addInitScript(() => {
@@ -131,7 +194,8 @@ test("MIDI note-on advances practice, while note-off and pedals do not", async (
   await ready(page);
   await page.getByRole("button", { name: "MIDI 연결", exact: true }).click();
   await expect(page.getByText(/Practice Piano 연결됨/)).toBeVisible();
-  await page.getByRole("button", { name: "연습 시작", exact: true }).click();
+  await start(page);
+  await page.clock.runFor(1700);
   const send = (data: number[]) =>
     page.evaluate(
       (bytes) =>
@@ -140,20 +204,31 @@ test("MIDI note-on advances practice, while note-off and pedals do not", async (
         }),
       data,
     );
+  const before = await beat(page);
   await send([0x90, 76, 100]);
-  await expect(progress(page)).toHaveAttribute("value", "1");
-  await send([0x90, 75, 0]);
+  await send([0x80, 76, 0]);
   await send([0xb0, 64, 127]);
+  expect(await beat(page)).toBe(before);
+  await expect(page.locator('[data-note="76"]')).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await page.clock.runFor(250);
   await expect(progress(page)).toHaveAttribute("value", "1");
-  await send([0x90, 75, 100]);
-  await expect(progress(page)).toHaveAttribute("value", "2");
+  await expect(page.locator('[data-note="75"]')).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await send([0xb0, 64, 0]);
+  await page.clock.runFor(500);
+  expect(await beat(page)).toBeGreaterThan(0.9);
 });
 
 test("practice controls meet WCAG AA and expose the exact score sources", async ({
   page,
   request,
 }) => {
-  await ready(page);
+  await ready(page, false);
   await page.getByText("발췌 범위와 악보 출처", { exact: true }).click();
   await expect(page.getByText(/Stelios Samelis/)).toBeVisible();
   const response = await request.get(
@@ -170,38 +245,4 @@ test("practice controls meet WCAG AA and expose the exact score sources", async 
         .analyze()
     ).violations,
   ).toEqual([]);
-  await page.setViewportSize({ width: 1440, height: 1200 });
-  await page.getByText("발췌 범위와 악보 출처", { exact: true }).click();
-  await page.evaluate(() => document.fonts.ready);
-  await page.screenshot({
-    path: "/tmp/still-piano-practice-desktop.png",
-    fullPage: true,
-  });
-});
-
-test.describe("mobile practice", () => {
-  test.use({
-    viewport: { width: 390, height: 844 },
-    isMobile: true,
-    hasTouch: true,
-  });
-  test("scrolls the target into view and accepts touch input without page overflow", async ({
-    page,
-  }) => {
-    await ready(page);
-    await page.getByRole("button", { name: "연습 시작", exact: true }).click();
-    const target = () => page.locator('.piano-key[data-expected="true"]');
-    await target().scrollIntoViewIfNeeded();
-    await target().tap();
-    await expect(progress(page)).toHaveAttribute("value", "1");
-    await target().tap();
-    await expect(progress(page)).toHaveAttribute("value", "2");
-    expect(
-      await page.evaluate(() => document.documentElement.scrollWidth),
-    ).toBe(390);
-    await page.screenshot({
-      path: "/tmp/still-piano-practice-mobile.png",
-      fullPage: true,
-    });
-  });
 });

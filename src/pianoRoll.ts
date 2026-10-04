@@ -22,13 +22,3 @@ export function pianoKeyGeometry(note: number, keys: number[]) {
   const center = ((position + (isBlack(note) ? 0 : 0.5)) / whites.length) * 100;
   return { center, width, left: center - width / 2 };
 }
-
-/** Stop the whole score at the next unplayed onset; a late frame cannot skip it. */
-export function advancePracticeBeat(
-  beat: number,
-  elapsedSeconds: number,
-  beatsPerSecond: number,
-  target: number,
-) {
-  return Math.min(target, beat + Math.max(0, elapsedSeconds) * beatsPerSecond);
-}

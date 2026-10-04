@@ -33,7 +33,7 @@ import type { SampleState } from "./audio";
 import { PracticePanel } from "./PracticePanel";
 import { FallingNotes } from "./FallingNotes";
 import "./pianoRoll.css";
-import { buildTimeline, ROLL_LEAD_BEATS } from "./pianoRoll";
+import { LessonPlayer } from "./lessonPlayer";
 import { initialPractice, practiceReducer } from "./practice";
 import { keyboardOctaveFor, lessonNotes, SONGS } from "./songs";
 import {
@@ -105,9 +105,7 @@ export default function App() {
     initialPractice,
   );
   const practiceEnabled = useRef(false);
-  const [previewing, setPreviewing] = useState(false);
-  const [previewStartedAt, setPreviewStartedAt] = useState<number | null>(null);
-  const [previewSpeed, setPreviewSpeed] = useState(1);
+  const [practiceSpeed, setPracticeSpeed] = useState(1);
   const song = SONGS.find((item) => item.id === practice.songId)!;
   const notes = useMemo(
     () => lessonNotes(song, practice.section),
@@ -117,6 +115,17 @@ export default function App() {
   const expectedNote =
     mode === "practice" ? notes[practice.cursor]?.midi : undefined;
   const audio = useRef<PianoAudio | null>(null);
+  const lessonPlayer = useMemo(
+    () =>
+      new LessonPlayer(notes, song.bpm, {
+        noteOn: (id, midi) =>
+          audio.current?.performance.noteOn(id, midi, 0.65, "lesson"),
+        stop: (id) => audio.current?.performance.stop(id),
+      }),
+    [notes, song.bpm],
+  );
+  const lessonPlayerRef = useRef(lessonPlayer);
+  lessonPlayerRef.current = lessonPlayer;
   const [sampleState, setSampleState] = useState<SampleState>("loading");
   const [activeNotes, setActiveNotes] = useState<number[]>([]);
   const [volume, setVolume] = useState(readVolume);
@@ -137,6 +146,7 @@ export default function App() {
   const pointers = useRef(new Map<number, number>());
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const demoGeneration = useRef(0);
+  const lessonGeneration = useRef(0);
   const sustain = latchedSustain || spaceSustain;
 
   const stopDemo = useCallback(() => {
@@ -145,13 +155,15 @@ export default function App() {
     timers.current = [];
     audio.current?.performance.stop("demo:");
     setPlaying(false);
-    setPreviewing(false);
-    setPreviewStartedAt(null);
   }, []);
 
   const panic = useCallback(() => {
+    lessonGeneration.current++;
     stopDemo();
-    dispatchPractice({ type: "pause" });
+    dispatchPractice({
+      type: "playback",
+      position: lessonPlayerRef.current.pause(performance.now()),
+    });
     audio.current?.performance.stop();
     pointers.current.clear();
     setLatchedSustain(false);
@@ -159,14 +171,7 @@ export default function App() {
   }, [stopDemo]);
 
   useEffect(() => {
-    const engine = new PianoAudio(
-      setActiveNotes,
-      setSampleState,
-      (note, scope) => {
-        if (practiceEnabled.current && scope !== "demo")
-          dispatchPractice({ type: "note", note });
-      },
-    );
+    const engine = new PianoAudio(setActiveNotes, setSampleState);
     audio.current = engine;
     void engine.prepare();
     const silenceWhenHidden = () => {
@@ -233,12 +238,7 @@ export default function App() {
   useEffect(() => {
     if (expectedNote === undefined) return;
     const nextOctave = keyboardOctaveFor(expectedNote, octave);
-    if (nextOctave !== octave) {
-      audio.current?.performance.stop("keyboard:");
-      audio.current?.performance.stop("pointer:");
-      pointers.current.clear();
-      setOctave(nextOctave);
-    }
+    if (nextOctave !== octave) setOctave(nextOctave);
     const viewport = keyboardViewport.current;
     const target = viewport?.querySelector<HTMLElement>(
       `[data-note="${expectedNote}"]`,
@@ -260,57 +260,46 @@ export default function App() {
 
   const startLesson = async () => {
     panic();
-    const generation = ++demoGeneration.current;
+    const generation = ++lessonGeneration.current;
     if (
       !(await audio.current?.unlock()) ||
-      generation !== demoGeneration.current
+      generation !== lessonGeneration.current
     )
       return;
-    dispatchPractice({ type: "start" });
+    dispatchPractice({
+      type: "playback",
+      position: lessonPlayer.start(performance.now()),
+    });
     keyboardViewport.current?.focus({ preventScroll: true });
     keyboardViewport.current
       ?.closest(".piano-studio")
       ?.scrollIntoView({ block: "center" });
   };
 
-  const previewLesson = async () => {
-    if (previewing) {
-      stopDemo();
-      return;
-    }
-    panic();
-    const generation = ++demoGeneration.current;
-    if (
-      !(await audio.current?.unlock()) ||
-      generation !== demoGeneration.current
-    )
-      return;
-    setPreviewing(true);
-    const beatMs = 60000 / (song.bpm * previewSpeed);
-    const timeline = buildTimeline(notes);
-    setPreviewStartedAt(performance.now());
-    timeline.entries.forEach((note) => {
-      const id = `demo:lesson:${note.index}`;
-      timers.current.push(
-        setTimeout(
-          () => audio.current?.performance.noteOn(id, note.midi, 0.65, "demo"),
-          (ROLL_LEAD_BEATS + note.start) * beatMs,
-        ),
-      );
-      timers.current.push(
-        setTimeout(
-          () => audio.current?.performance.noteOff(id),
-          (ROLL_LEAD_BEATS + note.start + note.beats * 0.92) * beatMs,
-        ),
-      );
-    });
-    timers.current.push(
-      setTimeout(stopDemo, (ROLL_LEAD_BEATS + timeline.duration) * beatMs),
-    );
-    keyboardViewport.current
-      ?.closest(".piano-studio")
-      ?.scrollIntoView({ block: "center" });
-  };
+  useEffect(() => {
+    lessonPlayer.setSpeed(practiceSpeed, performance.now());
+    lessonPlayer.loop = practice.loop;
+  }, [lessonPlayer, practiceSpeed, practice.loop]);
+
+  useEffect(() => {
+    if (practice.status === "ready") lessonPlayer.reset();
+    if (practice.status !== "practicing") return;
+    let frame = 0;
+    const tick = (now: number) => {
+      const position = lessonPlayer.tick(now);
+      dispatchPractice({ type: "playback", position });
+      if (position.status === "practicing") frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [lessonPlayer, practice.status]);
+
+  useEffect(
+    () => () => {
+      lessonPlayer.pause(performance.now());
+    },
+    [lessonPlayer],
+  );
 
   useEffect(() => {
     const down = (event: KeyboardEvent) => {
@@ -533,7 +522,7 @@ export default function App() {
         aria-pressed={activeNotes.includes(note)}
         data-expected={expectedNote === note ? "true" : undefined}
         tabIndex={-1}
-        className={`piano-key ${black ? "black-key" : "white-key"} ${activeNotes.includes(note) ? "pressed" : ""} ${expectedNote === note && !previewing ? "expected-key" : ""} ${note === 60 ? "middle-c" : ""}`}
+        className={`piano-key ${black ? "black-key" : "white-key"} ${activeNotes.includes(note) ? "pressed" : ""} ${expectedNote === note ? "expected-key" : ""} ${note === 60 ? "middle-c" : ""}`}
         style={
           black
             ? {
@@ -560,7 +549,7 @@ export default function App() {
           {!black && note % 12 === 0 ? noteName(note) : ""}
         </span>
         {note === 60 && <span className="middle-c-dot" />}
-        {expectedNote === note && !previewing && (
+        {expectedNote === note && (
           <span className="expected-marker" aria-label="다음 연습 음">
             ●
           </span>
@@ -647,13 +636,11 @@ export default function App() {
             state={practice}
             dispatch={dispatchPractice}
             octave={octave}
-            previewing={previewing}
-            speed={previewSpeed}
+            speed={practiceSpeed}
             disabled={sampleState === "unsupported"}
-            onSpeed={setPreviewSpeed}
+            onSpeed={setPracticeSpeed}
             onStart={() => void startLesson()}
             onStop={panic}
-            onPreview={() => void previewLesson()}
           />
         )}
 
@@ -731,23 +718,19 @@ export default function App() {
                     {song.title} · {practice.cursor}/{notes.length}음
                   </span>
                   <span className="keyboard-lesson-target">
-                    {practice.status === "complete" && !previewing ? (
-                      "완주! 멋진 연주였어요."
+                    {practice.status === "complete" ? (
+                      "선율 재생이 끝났어요."
                     ) : (
                       <>
-                        {previewing
-                          ? "미리 듣기"
-                          : practice.status === "paused"
-                            ? "일시정지 · 다음 음"
-                            : "다음 음"}
+                        {practice.status === "paused"
+                          ? "일시정지 · 이어 칠 음"
+                          : "따라 칠 음"}
                         <strong>
-                          {previewing
-                            ? activeNotes.map(noteName).join(" · ") || "♪"
-                            : noteName(expectedNote!)}
+                          {expectedNote === undefined
+                            ? "쉼"
+                            : noteName(expectedNote)}
                         </strong>
-                        {!previewing && (
-                          <kbd>{KEY_LABELS[expectedNote! - base]}</kbd>
-                        )}
+                        <kbd>{KEY_LABELS[expectedNote! - base]}</kbd>
                       </>
                     )}
                   </span>
@@ -812,9 +795,7 @@ export default function App() {
                       notes={notes}
                       keys={keys}
                       state={practice}
-                      bpm={song.bpm}
-                      speed={previewSpeed}
-                      previewStartedAt={previewStartedAt}
+                      player={lessonPlayer}
                       activeNotes={activeNotes}
                     />
                   )}
@@ -1003,14 +984,14 @@ export default function App() {
             </h3>
             <p>
               ‘곡 연습’에서 곡과 구간을 선택하고 연습을 시작하세요. 위에서
-              내려오는 막대가 건반 위 선에 닿으면 해당 건반을 누르세요. 맞는
-              음을 누를 때까지 기다려 줍니다. 키보드·터치·MIDI로 연습할 수
+              내려오는 막대가 건반 위 선에 닿으면 해당 건반을 누르세요. 음악은
+              입력과 관계없이 자동으로 재생됩니다. 키보드·터치·MIDI로 따라 칠 수
               있어요.
             </p>
             <p>
-              수록곡은 주요 선율의 단선율 발췌입니다. 박자와 음 길이는 채점하지
-              않으며, 미리 듣기에서는 선율의 리듬을 들을 수 있어요. 창을
-              벗어나거나 가이드를 열면 일시정지합니다.
+              수록곡은 주요 선율의 단선율 발췌입니다. 연주를 채점하지 않으며,
+              진행 속도와 구간 반복을 조절해 연습할 수 있어요. 창을 벗어나거나
+              가이드를 열면 일시정지합니다.
             </p>
           </section>
           <section className="credits">

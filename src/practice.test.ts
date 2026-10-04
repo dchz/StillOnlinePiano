@@ -6,67 +6,28 @@ import {
 } from "./practice";
 import { keyboardOctaveFor, lessonNotes, SONGS } from "./songs";
 
-describe("self-paced practice", () => {
-  it("requires the correct pitch and octave and ignores input before starting or while paused", () => {
-    expect(practiceReducer(initialPractice, { type: "note", note: 76 })).toBe(
-      initialPractice,
-    );
-    let state = practiceReducer(initialPractice, { type: "start" });
-    state = practiceReducer(state, { type: "note", note: 64 }); // E4 is not E5.
-    expect(state.cursor).toBe(0);
-    expect(state.mistakes).toBe(1);
-    state = practiceReducer(state, { type: "note", note: 76 });
-    expect(state.cursor).toBe(1);
-    state = practiceReducer(state, { type: "pause" });
-    expect(practiceReducer(state, { type: "note", note: 75 })).toBe(state);
-    state = practiceReducer(state, { type: "start" });
-    expect(practiceReducer(state, { type: "note", note: 75 }).cursor).toBe(2);
-  });
-
-  it("completes once, ignores extra notes, and restarts without carrying old scores", () => {
-    let state = practiceReducer(initialPractice, {
-      type: "section",
-      section: 0,
+describe("automatic practice progress", () => {
+  it("uses playback position and resets the selected section without carrying progress", () => {
+    let state: PracticeState = practiceReducer(initialPractice, {
+      type: "playback",
+      position: { beat: 3, cursor: 9, laps: 1, status: "complete" },
     });
-    state = practiceReducer(state, { type: "start" });
-    state = practiceReducer(state, { type: "note", note: 60 });
-    for (const note of SONGS[0].sections[0].notes)
-      state = practiceReducer(state, { type: "note", note: note.midi });
+    expect(state).toMatchObject({ cursor: 9, laps: 1, status: "complete" });
+    state = practiceReducer(state, { type: "section", section: 0 });
     expect(state).toMatchObject({
-      status: "complete",
-      cursor: 9,
-      laps: 1,
-      mistakes: 1,
-    });
-    expect(practiceReducer(state, { type: "note", note: 69 })).toBe(state);
-    expect(practiceReducer(state, { type: "start" })).toMatchObject({
-      status: "practicing",
       cursor: 0,
       laps: 0,
-      mistakes: 0,
-    });
-  });
-
-  it("loops only the selected phrase and resets when the song or section changes", () => {
-    let state: PracticeState = {
-      ...initialPractice,
-      status: "practicing",
-      loop: true,
+      status: "ready",
       section: 0,
-    };
-    for (let pass = 0; pass < 2; pass++) {
-      for (const note of SONGS[0].sections[0].notes)
-        state = practiceReducer(state, { type: "note", note: note.midi });
-    }
-    expect(state).toMatchObject({ status: "practicing", cursor: 0, laps: 2 });
-    state = practiceReducer(state, { type: "section", section: 1 });
-    expect(state).toMatchObject({ status: "ready", cursor: 0, laps: 0 });
+    });
+    state = practiceReducer(state, { type: "loop" });
+    expect(state.loop).toBe(true);
     state = practiceReducer(state, { type: "select", songId: "gymnopedie-1" });
     expect(state).toMatchObject({
       songId: "gymnopedie-1",
       section: null,
-      status: "ready",
       loop: false,
+      status: "ready",
     });
     expect(practiceReducer(state, { type: "section", section: 99 })).toBe(
       state,
