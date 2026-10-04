@@ -71,6 +71,7 @@ export class Performance {
     private attack: (id: string, note: number, velocity: number) => void,
     private release: (id: string) => void,
     private changed: (notes: number[]) => void = () => {},
+    private played: (note: number, scope: string) => void = () => {},
   ) {}
 
   noteOn(id: string, note: number, velocity = 0.75, scope = "manual") {
@@ -82,6 +83,7 @@ export class Performance {
     this.notes.set(id, { note, scope, held: true });
     this.attack(id, note, Math.min(1, Math.max(0, velocity)));
     this.notify();
+    this.played(note, scope);
   }
 
   noteOff(id: string) {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import {
   ArrowLeft,
@@ -23,6 +23,9 @@ import {
 } from "lucide-react";
 import { PianoAudio } from "./audio";
 import type { SampleState } from "./audio";
+import { PracticePanel } from "./PracticePanel";
+import { initialPractice, practiceReducer } from "./practice";
+import { keyboardOctaveFor, lessonNotes, SONGS } from "./songs";
 import {
   handleMidiMessage,
   isBlack,
@@ -86,6 +89,18 @@ function Brand({ small = false }: { small?: boolean }) {
 }
 
 export default function App() {
+  const [mode, setMode] = useState<"free" | "practice">("free");
+  const [practice, dispatchPractice] = useReducer(
+    practiceReducer,
+    initialPractice,
+  );
+  const practiceEnabled = useRef(false);
+  const [previewing, setPreviewing] = useState(false);
+  const [previewSpeed, setPreviewSpeed] = useState(1);
+  const song = SONGS.find((item) => item.id === practice.songId)!;
+  const notes = lessonNotes(song, practice.section);
+  const expectedNote =
+    mode === "practice" ? notes[practice.cursor]?.midi : undefined;
   const audio = useRef<PianoAudio | null>(null);
   const [sampleState, setSampleState] = useState<SampleState>("loading");
   const [activeNotes, setActiveNotes] = useState<number[]>([]);
@@ -115,10 +130,12 @@ export default function App() {
     timers.current = [];
     audio.current?.performance.stop("demo:");
     setPlaying(false);
+    setPreviewing(false);
   }, []);
 
   const panic = useCallback(() => {
     stopDemo();
+    dispatchPractice({ type: "pause" });
     audio.current?.performance.stop();
     pointers.current.clear();
     setLatchedSustain(false);
@@ -126,7 +143,14 @@ export default function App() {
   }, [stopDemo]);
 
   useEffect(() => {
-    const engine = new PianoAudio(setActiveNotes, setSampleState);
+    const engine = new PianoAudio(
+      setActiveNotes,
+      setSampleState,
+      (note, scope) => {
+        if (practiceEnabled.current && scope !== "demo")
+          dispatchPractice({ type: "note", note });
+      },
+    );
     audio.current = engine;
     void engine.prepare();
     const silenceWhenHidden = () => {
@@ -191,6 +215,82 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (expectedNote === undefined) return;
+    const nextOctave = keyboardOctaveFor(expectedNote, octave);
+    if (nextOctave !== octave) {
+      audio.current?.performance.stop("keyboard:");
+      audio.current?.performance.stop("pointer:");
+      pointers.current.clear();
+      setOctave(nextOctave);
+    }
+    const viewport = keyboardViewport.current;
+    const target = viewport?.querySelector<HTMLElement>(
+      `[data-note="${expectedNote}"]`,
+    );
+    if (viewport && target) {
+      const box = target.getBoundingClientRect();
+      const area = viewport.getBoundingClientRect();
+      viewport.scrollLeft +=
+        box.left + box.width / 2 - area.left - area.width / 2;
+    }
+  }, [expectedNote, octave]);
+
+  const switchMode = (nextMode: "free" | "practice") => {
+    panic();
+    practiceEnabled.current = nextMode === "practice";
+    setMode(nextMode);
+  };
+
+  const startLesson = async () => {
+    panic();
+    const generation = ++demoGeneration.current;
+    if (
+      !(await audio.current?.unlock()) ||
+      generation !== demoGeneration.current
+    )
+      return;
+    dispatchPractice({ type: "start" });
+    keyboardViewport.current?.focus({ preventScroll: true });
+    keyboardViewport.current
+      ?.closest(".piano-studio")
+      ?.scrollIntoView({ block: "center" });
+  };
+
+  const previewLesson = async () => {
+    if (previewing) {
+      stopDemo();
+      return;
+    }
+    panic();
+    const generation = ++demoGeneration.current;
+    if (
+      !(await audio.current?.unlock()) ||
+      generation !== demoGeneration.current
+    )
+      return;
+    setPreviewing(true);
+    let time = 0;
+    const beatMs = 60000 / (song.bpm * previewSpeed);
+    notes.forEach((note, index) => {
+      const id = `demo:lesson:${index}`;
+      timers.current.push(
+        setTimeout(
+          () => audio.current?.performance.noteOn(id, note.midi, 0.65, "demo"),
+          time,
+        ),
+      );
+      timers.current.push(
+        setTimeout(
+          () => audio.current?.performance.noteOff(id),
+          time + note.beats * beatMs * 0.92,
+        ),
+      );
+      time += (note.beats + (note.gapAfter ?? 0)) * beatMs;
+    });
+    timers.current.push(setTimeout(stopDemo, time));
+  };
+
+  useEffect(() => {
     const down = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement;
       if (
@@ -214,7 +314,8 @@ export default function App() {
       }
       if (event.code === "BracketLeft" || event.code === "BracketRight") {
         event.preventDefault();
-        if (!event.repeat) changeOctave(event.code === "BracketLeft" ? -1 : 1);
+        if (!event.repeat && !practiceEnabled.current)
+          changeOctave(event.code === "BracketLeft" ? -1 : 1);
         return;
       }
       const note = keyboardNote(event.code, octave);
@@ -272,6 +373,7 @@ export default function App() {
       stopDemo();
       return;
     }
+    panic();
     const generation = ++demoGeneration.current;
     if (
       !(await audio.current?.unlock()) ||
@@ -394,8 +496,9 @@ export default function App() {
         data-note={note}
         aria-label={`${noteName(note)}${mapped ? `, 키보드 ${KEY_LABELS[note - base]}` : ""}`}
         aria-pressed={activeNotes.includes(note)}
+        data-expected={expectedNote === note ? "true" : undefined}
         tabIndex={-1}
-        className={`piano-key ${black ? "black-key" : "white-key"} ${activeNotes.includes(note) ? "pressed" : ""} ${note === 60 ? "middle-c" : ""}`}
+        className={`piano-key ${black ? "black-key" : "white-key"} ${activeNotes.includes(note) ? "pressed" : ""} ${expectedNote === note ? "expected-key" : ""} ${note === 60 ? "middle-c" : ""}`}
         style={
           black
             ? {
@@ -422,12 +525,17 @@ export default function App() {
           {!black && note % 12 === 0 ? noteName(note) : ""}
         </span>
         {note === 60 && <span className="middle-c-dot" />}
+        {expectedNote === note && (
+          <span className="expected-marker" aria-label="다음 연습 음">
+            ●
+          </span>
+        )}
       </button>
     );
   };
 
   return (
-    <div className="site-shell">
+    <div className={`site-shell ${mode === "practice" ? "practice-mode" : ""}`}>
       <header className="site-header">
         <a className="home-link" href="#" aria-label="Still Online Piano 홈">
           <Brand />
@@ -484,6 +592,35 @@ export default function App() {
             </button>
           </div>
         </section>
+
+        <div className="mode-switch" role="group" aria-label="연주 모드">
+          <button
+            aria-pressed={mode === "free"}
+            onClick={() => switchMode("free")}
+          >
+            자유 연주
+          </button>
+          <button
+            aria-pressed={mode === "practice"}
+            onClick={() => switchMode("practice")}
+          >
+            곡 연습 <span>NEW</span>
+          </button>
+        </div>
+        {mode === "practice" && (
+          <PracticePanel
+            state={practice}
+            dispatch={dispatchPractice}
+            octave={octave}
+            previewing={previewing}
+            speed={previewSpeed}
+            disabled={sampleState === "unsupported"}
+            onSpeed={setPreviewSpeed}
+            onStart={() => void startLesson()}
+            onStop={panic}
+            onPreview={() => void previewLesson()}
+          />
+        )}
 
         <section className="studio-section" aria-label="온라인 피아노">
           <div className="studio-caption">
@@ -552,6 +689,47 @@ export default function App() {
                 </button>
               </div>
             </div>
+            {mode === "practice" && (
+              <div className="keyboard-lesson-hint">
+                <div>
+                  <span className="keyboard-lesson-title">
+                    {song.title} · {practice.cursor}/{notes.length}음
+                  </span>
+                  <span className="keyboard-lesson-target">
+                    {practice.status === "complete" ? (
+                      "완주! 멋진 연주였어요."
+                    ) : (
+                      <>
+                        {previewing
+                          ? "미리 듣는 중 · 연습할 음"
+                          : practice.status === "paused"
+                            ? "일시정지 · 다음 음"
+                            : "다음 음"}
+                        <strong>{noteName(expectedNote!)}</strong>
+                        <kbd>{KEY_LABELS[expectedNote! - base]}</kbd>
+                      </>
+                    )}
+                  </span>
+                </div>
+                <button
+                  className="lesson-secondary"
+                  disabled={sampleState === "unsupported"}
+                  onClick={() =>
+                    practice.status === "practicing"
+                      ? panic()
+                      : void startLesson()
+                  }
+                >
+                  {practice.status === "practicing"
+                    ? "연습 일시정지"
+                    : practice.status === "paused"
+                      ? "연습 이어하기"
+                      : practice.status === "complete"
+                        ? "한 번 더 연주"
+                        : "여기서 연습 시작"}
+                </button>
+              </div>
+            )}
             <div className="piano-body">
               <div className="fallboard">
                 <span>Still Online Piano</span>
@@ -601,7 +779,7 @@ export default function App() {
                 <span>옥타브</span>
                 <button
                   aria-label="옥타브 낮추기"
-                  disabled={octave === 2}
+                  disabled={octave === 2 || mode === "practice"}
                   onClick={() => changeOctave(-1)}
                 >
                   <ArrowLeft size={14} />
@@ -612,7 +790,7 @@ export default function App() {
                 </span>
                 <button
                   aria-label="옥타브 높이기"
-                  disabled={octave === 5}
+                  disabled={octave === 5 || mode === "practice"}
                   onClick={() => changeOctave(1)}
                 >
                   <ArrowRight size={14} />
@@ -751,6 +929,21 @@ export default function App() {
               허용해 주세요. 데스크톱 Chrome·Edge 등 Web MIDI 지원 브라우저와
               HTTPS 접속이 필요해요. 88건반 음역, 연주 세기, 서스테인 페달을
               지원합니다.
+            </p>
+          </section>
+          <section>
+            <h3>
+              <Piano size={18} /> 곡 연습
+            </h3>
+            <p>
+              ‘곡 연습’에서 곡과 구간을 선택하고 연습을 시작하세요. 표시된 음을
+              누르면 다음 음으로 넘어갑니다. 키보드·터치·MIDI로 연습할 수
+              있어요.
+            </p>
+            <p>
+              수록곡은 주요 선율의 단선율 발췌입니다. 박자와 음 길이는 채점하지
+              않으며, 미리 듣기에서는 선율의 리듬을 들을 수 있어요. 창을
+              벗어나거나 가이드를 열면 일시정지합니다.
             </p>
           </section>
           <section className="credits">

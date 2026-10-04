@@ -33,11 +33,13 @@ export class PianoAudio {
   constructor(
     changed: (notes: number[]) => void,
     private state: (state: SampleState) => void,
+    played?: (note: number, scope: string) => void,
   ) {
     this.performance = new Performance(
       this.attack.bind(this),
       this.release.bind(this),
       changed,
+      played,
     );
   }
 
