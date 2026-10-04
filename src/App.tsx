@@ -906,8 +906,8 @@ export default function App() {
         )}
       </main>
       <footer className="site-footer">
-        <Brand small />
         {mode === "practice" && <SongSource songId={practice.songId} />}
+        <Brand small />
       </footer>
 
       <dialog

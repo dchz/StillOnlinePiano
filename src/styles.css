@@ -249,7 +249,6 @@
 .song-source {
   flex-basis: 100%;
   margin: 0;
-  padding-bottom: 24px;
   font-size: 11px;
   color: #596454;
   line-height: 1.9;
@@ -1181,7 +1180,7 @@ kbd {
   color: #65705c;
 }
 .site-footer:has(.song-source) {
-  padding-top: 24px;
+  padding-block: 24px;
   row-gap: 18px;
 }
 .brand-small {
