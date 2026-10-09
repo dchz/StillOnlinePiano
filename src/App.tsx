@@ -156,31 +156,46 @@ export default function App() {
     setPlaying(false);
   }, []);
 
-  const panic = useCallback(() => {
+  const pausePlayback = useCallback(() => {
     lessonGeneration.current++;
     stopDemo();
     dispatchPractice({
       type: "playback",
       position: lessonPlayerRef.current.pause(performance.now()),
     });
+  }, [stopDemo]);
+
+  const panic = useCallback(() => {
+    pausePlayback();
     audio.current?.performance.stop();
     pointers.current.clear();
     setLatchedSustain(false);
     setSpaceSustain(false);
-  }, [stopDemo]);
+  }, [pausePlayback]);
 
   useEffect(() => {
     const engine = new PianoAudio(setActiveNotes, setSampleState);
     audio.current = engine;
     void engine.prepare();
-    const silenceWhenHidden = () => {
-      if (document.hidden) panic();
+    const releaseLocalInputs = () => {
+      pausePlayback();
+      // Key-up and pointer-up can be lost when leaving the window. MIDI keeps
+      // delivering its own note-off and pedal events while the page is hidden.
+      engine.performance.stop("keyboard:");
+      engine.performance.stop("pointer:");
+      engine.performance.sustain(false);
+      pointers.current.clear();
+      setLatchedSustain(false);
+      setSpaceSustain(false);
     };
-    window.addEventListener("blur", panic);
-    document.addEventListener("visibilitychange", silenceWhenHidden);
+    const releaseWhenHidden = () => {
+      if (document.hidden) releaseLocalInputs();
+    };
+    window.addEventListener("blur", releaseLocalInputs);
+    document.addEventListener("visibilitychange", releaseWhenHidden);
     return () => {
-      window.removeEventListener("blur", panic);
-      document.removeEventListener("visibilitychange", silenceWhenHidden);
+      window.removeEventListener("blur", releaseLocalInputs);
+      document.removeEventListener("visibilitychange", releaseWhenHidden);
       timers.current.forEach(clearTimeout);
       if (midi.current) midi.current.onstatechange = null;
       attachedInputs.current.forEach((input) => {
@@ -188,7 +203,7 @@ export default function App() {
       });
       engine.dispose();
     };
-  }, [panic]);
+  }, [pausePlayback]);
 
   useEffect(() => {
     audio.current?.setVolume(volume / 100);
@@ -452,14 +467,10 @@ export default function App() {
         }
         connected.forEach((input) => {
           input.onmidimessage = (event) => {
-            if (
-              !audio.current ||
-              !event.data ||
-              document.hidden ||
-              guide.current?.open
-            )
-              return;
+            if (!audio.current || !event.data || guide.current?.open) return;
             stopDemo();
+            if ((event.data[0] & 0xf0) === 0x90 && event.data[2] > 0)
+              void audio.current.unlock();
             handleMidiMessage(event.data, input.id, audio.current.performance);
           };
         });
