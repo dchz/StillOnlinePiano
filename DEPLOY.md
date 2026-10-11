@@ -51,3 +51,19 @@ DNS가 반영되면 저장소의 **Settings → Pages → Custom domain**에 `st
 도메인을 설정한 뒤 배포 워크플로를 다시 실행합니다. `actions/configure-pages`에서 읽은 공개 주소에 맞춰 `/`로 빌드하므로 JavaScript, 글꼴, 음원, 악보를 새 도메인에서 불러올 수 있습니다. 로컬에서는 `npm run build -- --base=/`와 `npm run preview -- --base=/`로 확인합니다.
 
 GitHub의 인증서 발급이 끝나면 **Enforce HTTPS**를 켜고 `https://stillpiano.com/`에서 사이트와 MIDI 연결을 확인합니다. DNS와 인증서 반영에는 시간이 걸릴 수 있습니다. `www.stillpiano.com`과 기존 GitHub Pages 주소의 리디렉션도 확인합니다.
+
+## 검색엔진에 사이트 등록하기
+
+현재 대표 주소는 `https://stillpiano.com/`입니다. `index.html`의 검색 제목·설명, canonical, 공유 메타데이터와 WebSite 구조화 데이터에 이 주소를 사용합니다. `public/robots.txt`는 검색 수집을 허용하고 사이트맵 위치를 알리며, `public/sitemap.xml`에는 실제 공개 페이지인 홈페이지만 등록합니다. 대표 도메인을 바꾸거나 독립된 곡 페이지를 추가하면 해당 설정도 갱신하세요.
+
+1. [Google Search Console](https://search.google.com/search-console/welcome)에서 **URL 접두사**에 `https://stillpiano.com/`을 입력합니다.
+2. **HTML 태그** 소유확인 방법을 선택하고, 제공된 `google-site-verification` 메타태그를 `index.html`의 `<head>`에 추가해 배포합니다. React 실행 후 삽입하지 말고 HTML 원문에 넣습니다. 제공값을 임의로 만들거나 확인 후 삭제하지 마세요.
+3. Google 화면에서 **확인**을 누릅니다. **사이트맵** 메뉴에 `https://stillpiano.com/sitemap.xml`을 제출하고, **URL 검사**에서 홈페이지의 **색인 생성 요청**을 실행합니다.
+4. [네이버 서치어드바이저](https://searchadvisor.naver.com/)의 웹마스터 도구에서도 같은 대표 주소를 등록합니다. HTML 태그 방식의 `naver-site-verification` 메타태그를 HTML 원문에 추가해 배포한 뒤 소유확인을 완료합니다.
+5. 네이버의 **요청 → 사이트맵 제출**에 같은 사이트맵 주소를 입력하고, 필요하면 **요청 → 웹페이지 수집**에서 홈페이지 수집을 요청합니다.
+
+소유확인은 운영자의 Google·네이버 계정에서 완료해야 합니다. 등록·사이트맵 제출·수집 요청은 검색 노출이나 순위를 보장하지 않습니다. 실제 색인 상태는 Google URL 검사와 각 도구의 보고서에서 확인합니다.
+
+현재 앱은 JavaScript로 화면을 그립니다. Google은 JavaScript를 렌더링할 수 있지만, 원본 HTML만 수집하는 검색엔진은 본문을 충분히 읽지 못할 수 있습니다. 곡별 검색 유입을 확대할 때는 곡마다 직접 연습을 시작할 수 있는 고유 주소와 실제 설명을 만들고, 해당 내용을 정적 HTML로 제공하는 방식을 검토하세요.
+
+공식 안내: [Google 소유권 확인](https://support.google.com/webmasters/answer/9008080?hl=ko), [Google URL 검사](https://support.google.com/webmasters/answer/9012289?hl=ko), [네이버 소유확인](https://searchadvisor.naver.com/guide/faq-start-register), [네이버 사이트맵 제출](https://searchadvisor.naver.com/guide/request-feed).
