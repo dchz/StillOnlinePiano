@@ -32,4 +32,22 @@ npm run preview -- --base=/StillOnlinePiano/
 
 미리보기 서버에서 `/StillOnlinePiano/` 경로를 확인합니다. 배포용 빌드는 JavaScript, 글꼴, 음원을 모두 이 경로에서 가져오도록 구성됩니다. 브라우저 테스트의 Chromium 설치 방법은 `README.md`를 참고하세요.
 
-MIDI 연결에는 Web MIDI를 지원하는 브라우저와 HTTPS가 필요합니다. GitHub Pages 기본 주소는 HTTPS를 지원합니다. 도메인이나 저장소 이름을 변경하면 배포 경로도 함께 확인해야 합니다.
+MIDI 연결에는 Web MIDI를 지원하는 브라우저와 HTTPS가 필요합니다. GitHub Pages 기본 주소는 HTTPS를 지원합니다. 워크플로는 Pages의 공개 주소에 맞춰 배포 경로를 자동으로 선택합니다.
+
+## stillpiano.com 연결하기
+
+Cloudflare의 `stillpiano.com → DNS → Records`에서 아래 레코드를 추가합니다. 모든 레코드의 프록시는 **DNS only(회색 구름)**, TTL은 **Auto**로 설정합니다.
+
+| 유형 | 이름 | 값 |
+| --- | --- | --- |
+| A | `@` | `185.199.108.153` |
+| A | `@` | `185.199.109.153` |
+| A | `@` | `185.199.110.153` |
+| A | `@` | `185.199.111.153` |
+| CNAME | `www` | `dchz.github.io` |
+
+DNS가 반영되면 저장소의 **Settings → Pages → Custom domain**에 `stillpiano.com`을 저장합니다. GitHub Actions로 배포하므로 `CNAME` 파일만 추가해서는 Pages의 사용자 도메인이 설정되지 않습니다.
+
+도메인을 설정한 뒤 배포 워크플로를 다시 실행합니다. `actions/configure-pages`에서 읽은 공개 주소에 맞춰 `/`로 빌드하므로 JavaScript, 글꼴, 음원, 악보를 새 도메인에서 불러올 수 있습니다. 로컬에서는 `npm run build -- --base=/`와 `npm run preview -- --base=/`로 확인합니다.
+
+GitHub의 인증서 발급이 끝나면 **Enforce HTTPS**를 켜고 `https://stillpiano.com/`에서 사이트와 MIDI 연결을 확인합니다. DNS와 인증서 반영에는 시간이 걸릴 수 있습니다. `www.stillpiano.com`과 기존 GitHub Pages 주소의 리디렉션도 확인합니다.
