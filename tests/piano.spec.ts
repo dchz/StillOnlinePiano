@@ -149,25 +149,16 @@ test("octave changes, focus loss, pedal, labels, and volume behave correctly", a
   await expect(page.getByRole("slider", { name: "볼륨" })).toHaveValue("0");
 });
 
-test("demo can be interrupted by a live performance and guide restores focus", async ({
+test("guide pauses live performance and restores focus", async ({
   page,
 }) => {
   await ready(page);
-  await page.getByRole("button", { name: "먼저 들어볼까요?" }).click();
-  await expect(
-    page.getByRole("button", { name: "미리 듣기 멈추기" }),
-  ).toBeVisible();
-  await expect
-    .poll(() => page.locator(".piano-key.pressed").count())
-    .toBeGreaterThan(0);
   await page.keyboard.down("a");
-  await expect(
-    page.getByRole("button", { name: "먼저 들어볼까요?" }),
-  ).toBeVisible();
   await expect(key(page, 60)).toHaveAttribute("aria-pressed", "true");
-  await page.keyboard.up("a");
   await page.getByRole("button", { name: "사용 가이드" }).click();
   await expect(page.getByRole("dialog")).toBeVisible();
+  await expect(page.locator(".piano-key.pressed")).toHaveCount(0);
+  await page.keyboard.up("a");
   await page.keyboard.press("a");
   await expect(page.locator(".piano-key.pressed")).toHaveCount(0);
   await page.keyboard.press("Escape");

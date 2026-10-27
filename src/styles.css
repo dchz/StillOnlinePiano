@@ -493,13 +493,6 @@ button svg {
 .brand-icon:after {
   left: 16px;
 }
-.header-tagline {
-  font-size: 12px;
-  color: #65705c;
-  letter-spacing: 0.2px;
-  padding-left: 27px;
-  border-left: 1px solid #d9ddd4;
-}
 .guide-button {
   margin-left: auto;
   display: flex;
@@ -560,63 +553,6 @@ h1 > span {
   stroke-width: 1.4;
   fill: none;
   transform: rotate(12deg);
-}
-.intro-aside {
-  padding: 17px 33px 0 40px;
-  min-width: 340px;
-}
-.aside-rule {
-  display: block;
-  width: 26px;
-  height: 1px;
-  background: #b7bbae;
-  margin-bottom: 17px;
-}
-.intro-aside p {
-  font-size: 13px;
-  line-height: 1.95;
-  letter-spacing: -0.1px;
-  margin: 0;
-  color: #5e665f;
-}
-.demo-button {
-  margin-top: 21px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 0;
-  font-size: 12px;
-  color: var(--green);
-  font-weight: 500;
-}
-.demo-button:hover {
-  color: #182e25;
-}
-.demo-waves {
-  display: flex;
-  gap: 3px;
-  align-items: center;
-  height: 17px;
-  margin-left: 8px;
-}
-.demo-waves i {
-  display: block;
-  width: 2px;
-  background: #9bae9b;
-  height: 5px;
-  border-radius: 1px;
-}
-.demo-waves i:nth-child(2n) {
-  height: 11px;
-}
-.demo-waves i:nth-child(3) {
-  height: 17px;
-}
-.is-playing .demo-waves i {
-  animation: wave 0.7s ease-in-out infinite alternate;
-}
-.is-playing .demo-waves i:nth-child(2n) {
-  animation-delay: -0.4s;
 }
 .studio-caption {
   display: flex;
@@ -1390,9 +1326,6 @@ kbd {
   .octave-range {
     display: none;
   }
-  .intro-aside {
-    padding-right: 0;
-  }
   .instrument-toolbar {
     padding: 18px 20px;
   }
@@ -1404,18 +1337,8 @@ kbd {
   .site-header {
     height: 80px;
   }
-  .header-tagline {
-    display: none;
-  }
   .intro {
     padding: 0 0 38px;
-  }
-  .intro-aside {
-    min-width: 270px;
-    padding-left: 20px;
-  }
-  .intro-aside p {
-    font-size: 11px;
   }
   h1 {
     font-size: 43px;
@@ -1550,35 +1473,6 @@ kbd {
     width: 29px;
     height: 29px;
     bottom: 15px;
-  }
-  .intro-aside {
-    min-width: 0;
-    padding: 0;
-    margin-top: 53px;
-  }
-  .aside-rule {
-    display: none;
-  }
-  .intro-aside p {
-    display: none;
-  }
-  .demo-button {
-    font-size: 10px;
-    gap: 5px;
-    flex-wrap: wrap;
-    max-width: 86px;
-    margin: 0;
-    line-height: 1.8;
-  }
-  .demo-button svg {
-    width: 10px;
-  }
-  .demo-button > span:nth-child(2) {
-    white-space: nowrap;
-    max-width: none;
-  }
-  .demo-waves {
-    margin-left: 14px;
   }
   .studio-caption {
     padding-bottom: 11px;
@@ -1795,13 +1689,6 @@ kbd {
   .title-spark {
     left: 188px;
     width: 26px;
-  }
-  .intro-aside {
-    margin-top: 57px;
-  }
-  .demo-button {
-    font-size: 9px;
-    max-width: 68px;
   }
   .eyebrow {
     font-size: 6px;

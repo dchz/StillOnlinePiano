@@ -18,10 +18,8 @@ import {
   LoaderCircle,
   MousePointer2,
   Piano,
-  Play,
   PlugZap,
   Sparkles,
-  Square,
   Volume1,
   Volume2,
   VolumeX,
@@ -43,34 +41,6 @@ import {
   KEY_LABELS,
   noteName,
 } from "./music";
-
-const DEMO: [number, number, number][] = [
-  [0, 48, 1.8],
-  [0, 60, 0.45],
-  [0.5, 64, 0.45],
-  [1, 67, 0.45],
-  [1.5, 72, 0.85],
-  [2.5, 45, 1.8],
-  [2.5, 69, 0.45],
-  [3, 64, 0.45],
-  [3.5, 60, 0.45],
-  [4, 64, 0.85],
-  [5, 41, 1.8],
-  [5, 65, 0.45],
-  [5.5, 69, 0.45],
-  [6, 72, 0.45],
-  [6.5, 76, 0.85],
-  [7.5, 43, 1.8],
-  [7.5, 74, 0.45],
-  [8, 71, 0.45],
-  [8.5, 67, 0.45],
-  [9, 62, 0.85],
-  [10, 48, 2.5],
-  [10, 60, 2.5],
-  [10, 64, 2.5],
-  [10, 67, 2.5],
-  [10, 72, 2.5],
-];
 
 function readVolume() {
   try {
@@ -133,7 +103,6 @@ export default function App() {
   const [octave, setOctave] = useState(4);
   const [latchedSustain, setLatchedSustain] = useState(false);
   const [spaceSustain, setSpaceSustain] = useState(false);
-  const [playing, setPlaying] = useState(false);
   const [midiNames, setMidiNames] = useState<string[]>([]);
   const [midiBusy, setMidiBusy] = useState(false);
   const [midiMessage, setMidiMessage] = useState("");
@@ -144,26 +113,16 @@ export default function App() {
   const attachedInputs = useRef<Map<string, MIDIInput>>(new Map());
   const pointers = useRef(new Map<number, number>());
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
-  const demoGeneration = useRef(0);
   const lessonGeneration = useRef(0);
   const sustain = latchedSustain || spaceSustain;
 
-  const stopDemo = useCallback(() => {
-    demoGeneration.current++;
-    timers.current.forEach(clearTimeout);
-    timers.current = [];
-    audio.current?.performance.stop("demo:");
-    setPlaying(false);
-  }, []);
-
   const pausePlayback = useCallback(() => {
     lessonGeneration.current++;
-    stopDemo();
     dispatchPractice({
       type: "playback",
       position: lessonPlayerRef.current.pause(performance.now()),
     });
-  }, [stopDemo]);
+  }, []);
 
   const panic = useCallback(() => {
     pausePlayback();
@@ -230,7 +189,6 @@ export default function App() {
 
   const playNote = useCallback(
     (id: string, note: number, velocity = 0.75) => {
-      stopDemo();
       void audio.current?.unlock().then((ok) => {
         if (!ok)
           setAudioMessage(
@@ -239,7 +197,7 @@ export default function App() {
       });
       audio.current?.performance.noteOn(id, note, velocity);
     },
-    [stopDemo],
+    [],
   );
 
   const changeOctave = useCallback((delta: number) => {
@@ -403,37 +361,6 @@ export default function App() {
     pointers.current.delete(event.pointerId);
   };
 
-  const playDemo = async () => {
-    if (playing) {
-      stopDemo();
-      return;
-    }
-    panic();
-    const generation = ++demoGeneration.current;
-    if (
-      !(await audio.current?.unlock()) ||
-      demoGeneration.current !== generation
-    )
-      return;
-    setPlaying(true);
-    DEMO.forEach(([time, note, duration], index) => {
-      const id = `demo:${index}`;
-      timers.current.push(
-        setTimeout(
-          () => audio.current?.performance.noteOn(id, note, 0.6, "demo"),
-          time * 500,
-        ),
-      );
-      timers.current.push(
-        setTimeout(
-          () => audio.current?.performance.noteOff(id),
-          (time + duration) * 500,
-        ),
-      );
-    });
-    timers.current.push(setTimeout(stopDemo, 6500));
-  };
-
   const connectMidi = async () => {
     const navigatorWithMidi = navigator;
     if (!window.isSecureContext) {
@@ -468,7 +395,6 @@ export default function App() {
         connected.forEach((input) => {
           input.onmidimessage = (event) => {
             if (!audio.current || !event.data || guide.current?.open) return;
-            stopDemo();
             if ((event.data[0] & 0xf0) === 0x90 && event.data[2] > 0)
               void audio.current.unlock();
             handleMidiMessage(event.data, input.id, audio.current.performance);
@@ -582,7 +508,6 @@ export default function App() {
         <a className="home-link" href="#" aria-label="Still Online Piano 홈">
           <Brand />
         </a>
-        <span className="header-tagline">언제든, 당신의 작은 음악실.</span>
         <button className="guide-button" onClick={openGuide}>
           <CircleHelp size={17} /> 사용 가이드 <ChevronRight size={14} />
         </button>
@@ -618,33 +543,6 @@ export default function App() {
                 <path d="M34 7v18M34 43v18M7 34h18M43 34h18M15 15l12 12M43 43l12 12M15 55l12-12M43 27l12-12" />
               </svg>
             </h1>
-          </div>
-          <div className="intro-aside">
-            <span className="aside-rule" />
-            <p>
-              잘 치지 않아도 괜찮아요.
-              <br />
-              잠시 쉬어 가듯, 떠오르는 음을 눌러 보세요.
-            </p>
-            <button
-              className={`demo-button ${playing ? "is-playing" : ""}`}
-              onClick={() => void playDemo()}
-              disabled={sampleState === "unsupported"}
-            >
-              {playing ? (
-                <Square size={12} fill="currentColor" />
-              ) : (
-                <Play size={13} fill="currentColor" />
-              )}
-              <span>{playing ? "미리 듣기 멈추기" : "먼저 들어볼까요?"}</span>
-              <span className="demo-waves" aria-hidden="true">
-                <i />
-                <i />
-                <i />
-                <i />
-                <i />
-              </span>
-            </button>
           </div>
         </section>
 
