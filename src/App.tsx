@@ -26,6 +26,7 @@ import {
   X,
 } from "lucide-react";
 import { PianoAudio } from "./audio";
+import { PIANIST_QUOTES } from "./pianistQuotes";
 import type { SampleState } from "./audio";
 import { PracticeControls, SongLibrary, SongSource } from "./PracticePanel";
 import { FallingNotes } from "./FallingNotes";
@@ -68,6 +69,9 @@ function Brand({ small = false }: { small?: boolean }) {
 }
 
 export default function App() {
+  const [quote] = useState(
+    () => PIANIST_QUOTES[Math.floor(Math.random() * PIANIST_QUOTES.length)],
+  );
   const [mode, setMode] = useState<"free" | "practice">("free");
   const [practice, dispatchPractice] = useReducer(
     practiceReducer,
@@ -525,16 +529,16 @@ export default function App() {
               aria-pressed={mode === "practice"}
               onClick={() => switchMode("practice")}
             >
-              곡 연습 <span>NEW</span>
+              곡 연습
             </button>
           </div>
         </div>
         <section className="intro" aria-labelledby="main-title">
           <div className="intro-copy">
             <h1 id="main-title">
-              오늘의 마음을,
+              당신의 마음을,
               <br />
-              <span>건반 위에.</span>
+              <span>건반 위에</span>
               <svg
                 className="title-spark"
                 viewBox="0 0 70 70"
@@ -808,10 +812,20 @@ export default function App() {
 
         {mode === "practice" && <SongSource songId={practice.songId} />}
         {mode === "free" && (
-          <div className="closing-note">
-            <Sparkles size={15} strokeWidth={1.3} />
-            <span>틀린 음은 없어요. 당신의 음악이 있을 뿐.</span>
-          </div>
+          <figure className="closing-note">
+            <Sparkles size={15} strokeWidth={1.3} aria-hidden="true" />
+            <blockquote>“{quote.text}”</blockquote>
+            <figcaption>
+              — <a
+                href={quote.source}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={`${quote.pianist} 격언 출처 (새 탭)`}
+              >
+                {quote.pianist}
+              </a>
+            </figcaption>
+          </figure>
         )}
       </main>
       <footer className="site-footer">

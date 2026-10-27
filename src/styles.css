@@ -26,11 +26,6 @@
   color: #fff;
   background: #355e51;
 }
-.mode-switch span {
-  font-size: 8px;
-  margin-left: 6px;
-  letter-spacing: 1px;
-}
 .practice-section {
   margin-bottom: 26px;
 }
@@ -1095,12 +1090,27 @@ kbd {
 .closing-note {
   margin: 48px 0 42px;
   display: flex;
+  flex-wrap: wrap;
   justify-content: center;
   align-items: center;
   gap: 9px;
   color: #65705c;
   font-size: 11px;
   letter-spacing: 0.1px;
+  text-align: center;
+  line-height: 1.8;
+}
+.closing-note blockquote {
+  margin: 0;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+.closing-note figcaption {
+  flex-basis: 100%;
+}
+.closing-note a {
+  color: inherit;
+  text-underline-offset: 3px;
 }
 .closing-note svg {
   color: #b09573;
